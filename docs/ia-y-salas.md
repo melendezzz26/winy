@@ -1,10 +1,12 @@
 # Activar análisis de apuntes y salas de dos teléfonos
 
-La interfaz, el servidor y las pruebas están incluidos en esta rama. **La clave de IA y el alojamiento público no están configurados todavía.** El APK funciona sin conexión para las funciones locales. La IA y las salas entre teléfonos requieren el servidor activo y accesible por HTTPS.
+La interfaz, el servidor y las pruebas están incluidos en esta rama. El servicio del usuario está configurado como `https://winy.onrender.com`. La IA requiere elegir un proveedor y guardar su clave en Render. Las funciones locales del APK siguen disponibles sin conexión; la IA y las salas entre teléfonos requieren el servidor activo por HTTPS.
 
-## Modelo de IA recomendado
+**Para probar con la cuota gratuita de Google, sigue [la guía de Gemini](gemini.md).** Se configura `WINY_AI_PROVIDER=gemini`, `WINY_GEMINI_MODEL=gemini-3.8-flash` y el secreto `WINY_GEMINI_KEY`. Las instrucciones siguientes sobre OpenAI son la alternativa con facturación de OpenAI.
 
-Para esta versión, el modelo inicial es **`gpt-5.4-mini`**, usando **Responses API** y respuestas JSON con esquema estricto. Debe seleccionar conceptos centrales, resumirlos y generar preguntas de comprensión de tres alternativas, con una cita del documento y su página o diapositiva cuando estén disponibles. El servidor rechaza citas que no aparecen en las fuentes y valida las preguntas antes de guardarlas.
+## Modelo para el adaptador de OpenAI
+
+Si eliges OpenAI, el modelo inicial es **`gpt-5.4-mini`**, usando **Responses API** y respuestas JSON con esquema estricto. Ambos adaptadores seleccionan conceptos centrales, generan un resumen y crean preguntas de comprensión de tres alternativas con citas. El servidor rechaza citas que no aparecen en las fuentes y valida las preguntas antes de guardarlas.
 
 La recomendación inicial `gpt-5-mini` se sustituyó tras comprobar el catálogo oficial: tiene un retiro anunciado para el **11 de diciembre de 2026**. El modelo se puede cambiar mediante `WINY_AI_MODEL`. Fuente consultada: [tipos de modelos y notas de deprecación del SDK oficial](https://github.com/openai/openai-python/blob/main/src/openai/types/shared/chat_model.py). Consulta también [documentación de la API](https://developers.openai.com/api/docs) y [precios oficiales](https://openai.com/api/pricing/) antes de añadir saldo; no se ha fijado un presupuesto mensual ni contratado servicios en esta tarea.
 
@@ -50,7 +52,7 @@ El proveedor debe inyectar las variables de `.env.example` de forma segura. Winy
 
 En producción, configura `WINY_HOST=0.0.0.0`, el `PORT` indicado por el proveedor y `WINY_DB` dentro del volumen persistente. **Usar una sola instancia/proceso del servidor en esta versión**: SQLite y los límites de conexión están diseñados para esa configuración. No uses un disco efímero si quieres conservar identidades y partidas tras reiniciar.
 
-`GET /api/status` devuelve si el servidor está activo, si la IA está configurada y qué modelo usa. No muestra la clave. Un estado `ai: true` confirma que hay una variable configurada; la autorización y el saldo del proveedor se comprueban al ejecutar un análisis real.
+`GET /api/status` devuelve si el servidor está activo, si la IA está configurada, el proveedor (`openai` o `gemini`) y el modelo seleccionado. No muestra la clave. Un estado `ai: true` confirma que hay una variable configurada; la autorización y la cuota del proveedor se comprueban al ejecutar un análisis real.
 
 ## Conectar Android
 
@@ -79,6 +81,20 @@ La identidad es anónima y se guarda con un token privado en el dispositivo; no 
 
 ## Tratamiento de documentos
 
-Los lectores locales extraen texto. En modo IA, ese texto y los nombres de las fuentes se envían al servidor y a OpenAI. No se sube el PDF/DOCX/PPTX binario. El servidor conserva el juego generado, su resumen y las citas; no guarda el texto completo enviado. Se solicita `store: false` a Responses API; el tratamiento del proveedor sigue sus políticas de datos aplicables. Los escaneos siguen necesitando OCR o texto pegado: esta entrega no añade OCR.
+Los lectores locales extraen texto. En modo IA, ese texto y los nombres de las fuentes se envían al servidor y al proveedor seleccionado: OpenAI o Google Gemini. No se sube el PDF/DOCX/PPTX binario. El servidor conserva el juego generado, su resumen y las citas; no guarda el texto completo enviado. A OpenAI se solicita `store: false`; el tratamiento de cada proveedor sigue las políticas de datos aplicables a tu plan. Los escaneos siguen necesitando OCR o texto pegado: esta entrega no añade OCR.
 
 Se aceptan hasta 80.000 caracteres por análisis. El análisis sin conexión anterior permanece como opción explícita para completar palabras; no se presenta como IA ni se usa para fingir una respuesta si el proveedor falla.
+
+## Si OpenAI devuelve un límite o un error
+
+La clave de API identifica tu proyecto; crearla no garantiza que tenga saldo o cuota disponible. El plan de ChatGPT no sustituye la facturación de la API. No se presupone que las cuentas nuevas reciban créditos gratuitos.
+
+- **`ai_quota_exhausted`:** OpenAI informó falta de cuota, facturación inactiva o límite de gasto. Revisa en OpenAI Platform la facturación, los créditos vigentes y los límites del proyecto al que pertenece la clave. Cambiar de modelo no añade cuota al proyecto.
+- **`ai_rate_limited`:** límite temporal de solicitudes o tokens; espera y reduce la frecuencia o el tamaño del material.
+- **`ai_usage_limit`:** OpenAI devolvió 429 sin un código suficiente para distinguir la causa; revisa la cuota del proyecto y vuelve a probar más tarde.
+- **`ai_invalid_key`:** revisa el secreto `WINY_AI_KEY` del servidor. Nunca lo envíes al chat ni lo incluyas en el APK.
+- **`ai_model_unavailable` / `ai_access_denied`:** revisa el modelo configurado, permisos y posibles requisitos de verificación del proyecto.
+
+Los límites propios de Winy (cinco análisis por identidad y el límite global diario) tienen mensajes distintos. Se siguen contando los intentos fallidos para limitar reintentos.
+
+Winy incluye adaptadores para OpenAI y Gemini. Se seleccionan con `WINY_AI_PROVIDER`. Un nombre de modelo de Google en `WINY_AI_MODEL` no cambia de proveedor: Gemini usa `WINY_GEMINI_MODEL` y `WINY_GEMINI_KEY`, según [su guía de configuración](gemini.md).

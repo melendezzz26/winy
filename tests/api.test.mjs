@@ -4,6 +4,7 @@ import http from 'node:http';
 import { once } from 'node:events';
 import { createApi } from '../server/api.mjs';
 import { QUIZZES } from '../web/core/data.js';
+import { AIServiceError } from '../server/ai.mjs';
 
 async function fixture(t, overrides = {}) {
   let time = 1000000;
@@ -55,4 +56,15 @@ test('el análisis de IA exige clave activada, material suficiente y respeta el 
   const input = { sources: [{ name: 'Clase', text: 'Una explicación sobre la fotosíntesis. '.repeat(12) }] };
   assert.equal((await f.call('/study', player, input)).status, 201);
   assert.equal((await f.call('/study', player, input)).status, 429); assert.equal(calls, 1);
+});
+test('los errores de cuota del proveedor llegan al cliente sin invalidar la sesión de Winy', async t => {
+  const f = await fixture(t, { ai: { enabled: true, model: 'test-model', generate: async () => { throw new AIServiceError('OpenAI indica que no hay cuota disponible.', 503, 'ai_quota_exhausted'); } } });
+  const player = await f.player('Ana');
+  const result = await f.call('/study', player, { sources: [{ name: 'Clase', text: 'Un párrafo explicativo de prueba. '.repeat(12) }] });
+  assert.equal(result.status, 503); assert.equal(result.body.code, 'ai_quota_exhausted');
+  assert.equal((await f.call('/rooms', player, { topic: 'peru' })).status, 201);
+});
+test('el estado informa el proveedor y el modelo incluso si falta configurar su clave', async t => {
+  const f=await fixture(t,{ai:{enabled:false,provider:'gemini',model:'gemini-3.8-flash'}});
+  const response=await f.call('/status');assert.equal(response.status,200);assert.deepEqual(response.body,{online:true,ai:false,provider:'gemini',model:'gemini-3.8-flash'});
 });

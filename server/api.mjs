@@ -44,7 +44,7 @@ export function createApi({ dbPath = process.env.WINY_DB || path.resolve('.local
       const pathname = new URL(req.url, 'http://localhost').pathname;
       const ip = req.socket.remoteAddress || 'local';
       rate(`requests:${ip}`, 240, 60000);
-      if (req.method === 'GET' && pathname === '/api/status') return reply(200, { online: true, ai: ai.enabled, model: ai.enabled ? ai.model : null });
+      if (req.method === 'GET' && pathname === '/api/status') return reply(200, { online: true, ai: ai.enabled, provider: ai.provider || 'openai', model: ai.model });
       if (req.method === 'POST' && pathname === '/api/players') {
         rate(`players:${ip}`, 12, 3600000);
         const input = await body(req), nickname = typeof input.nickname === 'string' ? input.nickname.trim().slice(0, 28) : '';
@@ -116,7 +116,7 @@ export function createApi({ dbPath = process.env.WINY_DB || path.resolve('.local
       saveRoom(room); return reply(200, publicRoom(room, player.id, now));
     } catch (err) {
       const status = err.status || 502;
-      reply(status, { error: err.status ? err.message : err.message?.startsWith('El ') || err.message?.startsWith('La ') || err.message?.startsWith('No ') ? err.message : 'No se pudo completar la solicitud. Inténtalo de nuevo.' });
+      reply(status, { error: err.status ? err.message : err.message?.startsWith('El ') || err.message?.startsWith('La ') || err.message?.startsWith('No ') ? err.message : 'No se pudo completar la solicitud. Inténtalo de nuevo.', ...(err.status && err.code ? { code: err.code } : {}) });
     }
   }
   return { handle, close: () => db.close() };

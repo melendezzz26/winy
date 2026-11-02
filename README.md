@@ -1,8 +1,8 @@
 # Winy 🌱
 
-**[Descargar APK de prueba 0.2.0](https://github.com/melendezzz26/winy/raw/refs/heads/winy-apk-prueba/winy-debug.apk)** · [Configurar API y servidor](docs/ia-y-salas.md)
+**[Descargar APK de prueba 0.2.1](https://github.com/melendezzz26/winy/raw/refs/heads/winy-apk-prueba/winy-debug.apk)** · [Configurar Gemini para pruebas](docs/gemini.md) · [Configurar servidor](docs/ia-y-salas.md)
 
-Este APK actualiza mapa y accesorios. Para activar la IA y las salas en Internet, primero configura el servidor HTTPS y recompila con su dirección, como indica la guía. El APK incluido aún no tiene una dirección de servidor público.
+Este APK incluye mapa y accesorios actualizados y se conecta a `https://winy.onrender.com`. Para usar la IA configura el proveedor y su clave en Render; no se incluyen claves en el APK. Las salas necesitan que el servidor esté activo.
 
 Aplicación web móvil de hábitos y aprendizaje, creada a partir de las capturas del prototipo **Winy · Tu pequeña gran aventura**. Incluye cuatro compañeros peruanos, cinco secciones y progreso local. Las cuatro mascotas usan los PNG originales de `mascotas.zip`, con su transparencia y sin modificar los archivos. El logotipo SVG sigue siendo provisional.
 
@@ -41,7 +41,7 @@ En **Estudiar → Crear juego con mis archivos**, importa `examples/clase-fotosi
 
 El modo local crea preguntas para completar una palabra y conserva la frase original como evidencia. El modo IA selecciona ideas clave, genera un resumen y crea trivia con citas que se verifican contra el texto. Este segundo modo requiere activar la API en el servidor. No se incluye OCR: los escaneos, PDF con contraseña, `.doc` y `.ppt` no se procesan. Se guardan hasta 10 juegos en el dispositivo, con sus ejercicios y citas.
 
-Consulta [cómo configurar la API, el modelo y las salas](docs/ia-y-salas.md). Modelo inicial: **gpt-5.4-mini**. Falta configurar la clave y desplegar el servidor HTTPS para usar esas funciones desde un APK en Internet.
+Consulta [cómo configurar la API, el modelo y las salas](docs/ia-y-salas.md). Se puede elegir **OpenAI (`gpt-5.4-mini`)** o **Gemini (`gemini-3.8-flash`)**. Para pruebas con cuota gratuita de Google sigue [la guía de Gemini](docs/gemini.md); la cuota depende de tu cuenta y del modelo.
 
 ## Validar
 
