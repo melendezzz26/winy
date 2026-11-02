@@ -27,7 +27,7 @@ export function makeStudyGame(sources, topic = '') {
   return { id: `notes-${(hash >>> 0).toString(36)}`, title: topic.trim().slice(0, 100) || 'Mi aventura de estudio', icon: '📚', category: 'Tus apuntes · Completar palabras', questions };
 }
 export function checkStudyAnswer(answer, expected) { return normalize(answer) === normalize(expected); }
-export async function readSources(files) {
+export async function readSources(files, { signal, onProgress } = {}) {
   if (files.length > MAX_FILES) throw new Error('Puedes subir un máximo de 5 archivos a la vez.');
   for (const f of files) {
     if (f.size > MAX_BYTES) throw new Error(`«${f.name}» supera el límite de 8 MB.`);
@@ -35,10 +35,11 @@ export async function readSources(files) {
   }
   const sources = [];
   for (const file of files) {
+    signal?.throwIfAborted(); onProgress?.({ file: file.name, stage: 'reading' });
     if (/\.(txt|md|markdown)$/i.test(file.name)) sources.push({ name: file.name, text: await file.text() });
     else {
       const { readDocument } = await import('./documents.js');
-      sources.push(...await readDocument(file));
+      sources.push(...await readDocument(file, { signal, onProgress }));
     }
   }
   return sources;

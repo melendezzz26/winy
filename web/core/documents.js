@@ -5,7 +5,8 @@ function parseXML(bytes) {
   if (xml.querySelector('parsererror')) throw new Error('El documento contiene XML no válido.');
   return [...xml.getElementsByTagNameNS('*', 'p')].map(p => [...p.getElementsByTagNameNS('*', 't')].map(t => t.textContent).join('')).join('\n');
 }
-async function readOffice(file) {
+async function readOffice(file, { signal, onProgress }) {
+  signal?.throwIfAborted();
   const { unzipSync } = await import('../vendor/fflate.mjs');
   const word = /\.docx$/i.test(file.name);
   let declared = 0;
@@ -21,10 +22,11 @@ async function readOffice(file) {
   });
   const keys = Object.keys(files).sort((a, b) => Number(a.match(/slide(\d+)/)?.[1] || 0) - Number(b.match(/slide(\d+)/)?.[1] || 0));
   if (!keys.length) throw new Error('No se encontró texto de Word o PowerPoint en el archivo.');
-  return keys.map(key => ({ name: word ? file.name : `${file.name} · diapositiva ${key.match(/slide(\d+)/)[1]}`, text: parseXML(files[key]) }));
+  return keys.map((key, index) => { signal?.throwIfAborted(); onProgress?.({ file: file.name, page: index + 1, total: keys.length, stage: 'reading' }); return { name: word ? file.name : `${file.name} · diapositiva ${key.match(/slide(\d+)/)[1]}`, text: parseXML(files[key]) }; });
 }
-async function readPDF(file) {
+async function readPDF(file, { signal, onProgress }) {
   const pdfjs = await import('../vendor/pdf.mjs');
+  signal?.throwIfAborted();
   pdfjs.GlobalWorkerOptions.workerSrc = new URL('../vendor/pdf.worker.mjs', import.meta.url).href;
   const task = pdfjs.getDocument({
     data: new Uint8Array(await file.arrayBuffer()),
@@ -33,21 +35,26 @@ async function readPDF(file) {
     wasmUrl: new URL('../vendor/wasm/', import.meta.url).href,
     cMapPacked: true, useWasm: false, isEvalSupported: false
   });
+  const abort = () => { task.destroy().catch(() => {}); };
+  signal?.addEventListener('abort', abort, { once: true });
   try {
+    signal?.throwIfAborted();
     const doc = await task.promise;
     const sources = [];
     for (let page = 1; page <= Math.min(doc.numPages, 40); page++) {
+      signal?.throwIfAborted(); onProgress?.({ file: file.name, page, total: Math.min(doc.numPages, 40), stage: 'reading' });
       const content = await (await doc.getPage(page)).getTextContent();
       const text = content.items.map(item => 'str' in item ? item.str + (item.hasEOL ? '\n' : ' ') : '').join('');
       sources.push({ name: `${file.name} · página ${page}`, text });
     }
     if (!sources.some(s => s.text.trim().length > 30)) throw new Error('El PDF no contiene texto legible. Si es un escaneo, pega el texto de tu clase.');
     return sources;
-  } finally { await task.destroy(); }
+  } finally { signal?.removeEventListener('abort', abort); await task.destroy(); }
 }
-export async function readDocument(file) {
-  try { return /\.pdf$/i.test(file.name) ? await readPDF(file) : await readOffice(file); }
+export async function readDocument(file, options = {}) {
+  try { return /\.pdf$/i.test(file.name) ? await readPDF(file, options) : await readOffice(file, options); }
   catch (err) {
+    if (options.signal?.aborted) throw err;
     if (err.name === 'PasswordException') throw new Error(`«${file.name}» está protegido con contraseña. Usa una copia sin contraseña.`);
     throw new Error(`No pudimos leer «${file.name}». ${err.message}`);
   }

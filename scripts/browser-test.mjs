@@ -29,12 +29,21 @@ try {
   const page = await (await fetch(`http://127.0.0.1:${port}/json/new?about:blank`, { method: 'PUT' })).json();
   socket = new WebSocket(page.webSocketDebuggerUrl);
   await once(socket, 'open');
-  let id = 0, studyMock = null, studyPayload = null, statusMock = null; const pending = new Map(), errors = [];
+  let id = 0, studyMock = null, studyPayload = null, statusMock = null, jobMock = null, cancelledJob = false, accountMock = null; const progressWrites = [], pending = new Map(), errors = [];
   socket.addEventListener('message', ({ data }) => {
     const message = JSON.parse(data);
     if (message.method === 'Fetch.requestPaused') {
       const p = message.params;
-      if (studyMock && new URL(p.request.url).pathname === '/api/study') {
+      const path = new URL(p.request.url).pathname;
+      if (accountMock && (path.startsWith('/api/auth/') || path === '/api/account/progress')) {
+        const payload = path === '/api/auth/register' ? { requiresConfirmation:true } : path === '/api/auth/login' ? accountMock : path === '/api/account/progress' ? { saved:true } : { ok:true };
+        if (path === '/api/account/progress' && p.request.postData) progressWrites.push(JSON.parse(p.request.postData).progress);
+        cdp('Fetch.fulfillRequest', { requestId:p.requestId, responseCode:200, responseHeaders:[{name:'Content-Type',value:'application/json'}], body:Buffer.from(JSON.stringify(payload)).toString('base64') }).catch(error=>errors.push(error.message));
+      } else if (jobMock && path.startsWith('/api/study')) {
+        if (path.endsWith('/cancel')) { cancelledJob = true; jobMock.status = 'cancelled'; }
+        if (path === '/api/study') studyPayload = JSON.parse(p.request.postData || '{}');
+        cdp('Fetch.fulfillRequest', { requestId:p.requestId, responseCode:path === '/api/study' ? 202 : 200, responseHeaders:[{name:'Content-Type',value:'application/json'}], body:Buffer.from(JSON.stringify(jobMock)).toString('base64') }).catch(error=>errors.push(error.message));
+      } else if (studyMock && path === '/api/study') {
         studyPayload = JSON.parse(p.request.postData || '{}');
         cdp('Fetch.fulfillRequest', { requestId: p.requestId, responseCode: 201, responseHeaders: [{ name: 'Content-Type', value: 'application/json' }], body: Buffer.from(JSON.stringify(studyMock)).toString('base64') }).catch(error => errors.push(error.message));
       } else if (statusMock && new URL(p.request.url).pathname === '/api/status') {
@@ -64,6 +73,11 @@ try {
   assert.deepEqual(await evaluate(`Promise.all([...document.querySelectorAll('.pet-art image')].map(async element => { const image = new Image(); image.src = element.getAttribute('href'); await image.decode(); return [image.naturalWidth, image.naturalHeight]; }))`), Array(4).fill([1254, 1254]), 'Las cuatro mascotas originales deben cargar como PNG');
   await screenshot('bienvenida');
   await click('[data-pet="llama"]'); await set('#pet-name', 'Nubecita'); await submit('#onboarding-form');
+  await waitFor('document.querySelector(".tutorial") !== null');
+  await screenshot('tutorial'); await click('[data-action="tutorial-next"]');
+  assert.ok(await evaluate('document.querySelector(".tutorial h3").textContent.includes("apuntes")'));
+  await click('[data-action="tutorial-skip"]');
+  assert.equal((await saved()).tutorialSeen, true);
   assert.equal((await saved()).pet, 'llama'); assert.equal((await saved()).names.llama, 'Nubecita');
   await screenshot('hogar');
   const beforeGreeting = await saved();
@@ -133,7 +147,9 @@ try {
   await set('#notes', 'Solo un título'); await submit('#notes-form'); await waitFor('document.querySelector("#notes-error").textContent.length > 0');
   await set('#topic', 'Las plantas');
   await set('#notes', 'La fotosíntesis permite a las plantas producir azúcares usando la energía de la luz solar. Las raíces absorben el agua y los nutrientes que se encuentran en el suelo de los bosques.');
-  await submit('#notes-form'); await waitFor('document.querySelector("#answer-form") !== null');
+  await submit('#notes-form'); await waitFor('document.querySelector(".source-preview") !== null');
+  await screenshot('vista-previa'); await submit('#notes-form'); await waitFor('document.querySelector(".game-picker") !== null');
+  await click('[data-action="custom-quiz"][data-format="trivia"]'); await waitFor('document.querySelector("#answer-form") !== null');
   const game = (await saved()).games[0]; assert.equal(game.questions.length, 2);
   await set('#study-answer', 'incorrecta'); await submit('#answer-form'); assert.ok(await evaluate('document.querySelector("#feedback blockquote").textContent.length > 20')); await click('[data-action="next-question"]');
   await set('#study-answer', game.questions[1].expected); await submit('#answer-form'); await click('[data-action="next-question"]');
@@ -153,9 +169,11 @@ try {
   const extracted = await evaluate(`(async () => { const {readSources} = await import('/core/study.js'); const sources = await readSources(${JSON.stringify(fixtures)}.map(f => new File([Uint8Array.from(atob(f.data), c => c.charCodeAt(0))], f.name))); return sources; })()`);
   assert.equal(extracted.length, 4); assert.ok(extracted.every(s => s.text.includes('photosynthesis') || s.text.includes('roots'))); assert.ok(extracted.some(s => s.name.includes('página 1'))); assert.ok(extracted.some(s => s.name.includes('diapositiva 2')));
   assert.equal(await evaluate(`(async () => { const {readSources} = await import('/core/study.js'); try { await readSources([new File(['not a PDF'], 'roto.pdf')]); return false; } catch (error) { return error.message.includes('No pudimos leer'); } })()`), true, 'El PDF inválido debe rechazarse sin bloquear la aplicación');
+  assert.equal(await evaluate(`(async()=>{const {readDocument}=await import('/core/documents.js');const controller=new AbortController();const file=new File([Uint8Array.from(atob(${JSON.stringify(fixtures[2].data)}),c=>c.charCodeAt(0))],'cancelar.pdf');try{await readDocument(file,{signal:controller.signal,onProgress:()=>controller.abort()});return false;}catch{return controller.signal.aborted;}})()`),true,'Cancelar mientras se lee el PDF debe destruir su tarea sin dejar errores pendientes');
   await click('[data-action="notes"]');
   await evaluate(`{ const transfer = new DataTransfer(); transfer.items.add(new File([${JSON.stringify(s1 + ' ' + s2)}], 'mis-apuntes.txt', {type:'text/plain'})); document.querySelector('#files').files = transfer.files; }`);
-  await submit('#notes-form'); await waitFor('document.querySelector("#answer-form") !== null');
+  await submit('#notes-form'); await waitFor('document.querySelector(".source-preview") !== null'); await submit('#notes-form');
+  await waitFor('document.querySelector(".game-picker") !== null');
   assert.equal((await saved()).games.length, 2); await click('[data-action="close"]');
   console.log('✓ Lectura real de PDF, DOCX, PPTX y carga de TXT mediante el selector de archivos');
   await click('[data-action="focus"]'); await click('[data-duration="30"]'); await click('[data-action="focus-toggle"]'); await delay(1100); await click('[data-action="focus-toggle"]');
@@ -202,14 +220,15 @@ try {
   assert.ok(await evaluate('window.__winyShared.startsWith("Winy") && !window.__winyShared.includes("appassets.androidplatform.net")'));
   await evaluate('delete window.WinyAndroid; delete window.__winyShared');
   console.log('✓ Integración web con Atrás y compartir de Android (puente simulado)');
-  const text = 'La fotosíntesis transforma energía luminosa en energía química. Las raíces absorben agua y nutrientes del suelo.';
+  const text = 'La fotosíntesis transforma energía luminosa en energía química. Las raíces absorben agua y nutrientes del suelo. Las hojas utilizan el agua y el dióxido de carbono para producir azúcares con la energía de la luz solar, y liberan oxígeno.';
   studyMock = { id:'ai-browser-example', title:'Plantas: ideas centrales', icon:'📚', category:'Ideas clave · IA', summary:'Las plantas transforman energía y absorben recursos del suelo.', keyPoints:[{idea:'Conversión de energía',evidence:text.split('. ')[0]+'.',source:'Apuntes pegados'},{idea:'Absorción de recursos',evidence:text.split('. ')[1],source:'Apuntes pegados'}], questions:[{prompt:'¿Qué transforma la fotosíntesis?',options:['Energía luminosa','Sonido','Rocas'],answer:0,explanation:'Transforma energía luminosa en química.',evidence:text.split('. ')[0]+'.',source:'Apuntes pegados'},{prompt:'¿Qué absorben las raíces?',options:['Luz','Agua y nutrientes','Sonido'],answer:1,explanation:'Absorben agua y nutrientes del suelo.',evidence:text.split('. ')[1],source:'Apuntes pegados'}] };
   statusMock = { online:true, ai:true, provider:'gemini', model:'test-only-model' };
   await cdp('Fetch.enable', {patterns:[{urlPattern:'*/api/study'}, {urlPattern:'*/api/status'}]});
   await click('[data-view="study"]'); await click('[data-action="notes"]');
   await waitFor('document.querySelector("#study-mode option[value=ai]")?.disabled === false');
   await set('#study-mode', 'ai');
-  await set('#notes', text); await submit('#notes-form');
+  await set('#notes', text); await submit('#notes-form'); await waitFor('document.querySelector(".source-preview") !== null');
+  assert.equal(studyPayload, null, 'La vista previa no debe consumir una llamada de IA'); await submit('#notes-form');
   await waitFor('document.querySelector(".analysis-summary") !== null');
   assert.equal(await evaluate('document.querySelectorAll(".key-points article").length'), 2);
   assert.equal(studyPayload.sources[0].text, text); assert.equal(studyPayload.sources[0].name, 'Apuntes pegados');
@@ -234,6 +253,52 @@ try {
   assert.equal(await evaluate('document.querySelector("#ai-provider-name").textContent'), 'Google Gemini');
   await click('[data-action="close"]'); await cdp('Fetch.disable');
   console.log('✓ Recuperación del servicio de IA: actualizar disponibilidad sin reiniciar ni perder los apuntes');
+  statusMock.ai = true;
+  jobMock = { id:'00000000-0000-4000-8000-000000000001', status:'running', stage:'retrying', attempt:2, elapsed:2000 };
+  await cdp('Fetch.enable', {patterns:[{urlPattern:'*/api/study*'}, {urlPattern:'*/api/status'}]});
+  await click('[data-action="notes"]'); await waitFor('document.querySelector("#study-mode option[value=ai]")?.disabled === false'); await set('#study-mode','ai');
+  await evaluate(`{const transfer=new DataTransfer();transfer.items.add(new File([Uint8Array.from(atob(${JSON.stringify(fixtures[2].data)}),c=>c.charCodeAt(0))],'clase.pdf',{type:'application/pdf'}));document.querySelector('#files').files=transfer.files;}`);
+  await set('#notes', text); await submit('#notes-form'); await waitFor('document.querySelector(".source-preview") !== null'); await submit('#notes-form');
+  await waitFor('document.querySelector("#study-progress")?.textContent.includes("proveedor")');
+  jobMock.status = 'failed'; jobMock.error = 'Gemini está temporalmente ocupado. Tus apuntes siguen preparados.'; jobMock.code = 'ai_provider_unavailable';
+  await waitFor('document.querySelector("#notes-error")?.textContent.includes("ocupado") && document.querySelector("#notes-form button[type=submit]")?.disabled === false');
+  assert.equal(await evaluate('document.querySelector("#notes").value'), text);
+  assert.equal(await evaluate('document.querySelector("#files").files.length'), 1);
+  assert.ok(studyPayload.sources.some(s=>s.name.includes('clase.pdf · página 1')));
+  await evaluate(`Object.defineProperty(document.querySelector('#files').files[0],'arrayBuffer',{value:()=>{throw new Error('El PDF no debe leerse otra vez al reintentar');}})`);
+  jobMock = { ...jobMock, status:'completed', game:{ ...studyMock, id:'ai-retry-example' } };
+  await submit('#notes-form'); await waitFor('document.querySelector(".game-picker") !== null');
+  await click('[data-action="custom-quiz"][data-format="cards"]');
+  await click('[data-action="card-flip"]'); await screenshot('tarjeta-memoria'); await click('[data-action="card-rate"][data-correct="false"]'); await click('[data-action="next-question"]');
+  await click('[data-action="card-flip"]'); await click('[data-action="card-rate"][data-correct="true"]'); await click('[data-action="next-question"]');
+  assert.ok(await evaluate('document.querySelector("[data-action=review-errors]").textContent.includes("1")'));
+  const beforeReview = await saved(); await click('[data-action="review-errors"]');
+  await click('[data-action="answer"][data-answer="0"]'); await click('[data-action="next-question"]');
+  assert.equal((await saved()).xp, beforeReview.xp); assert.equal(await evaluate('document.querySelector("[data-action=review-errors]") === null'), true);
+  await click('[data-action="close"]');
+  console.log('✓ Preparación en segundo plano: progreso, fallo recuperable, reintento, tarjetas y repaso de errores sin premios duplicados');
+  jobMock = { id:'00000000-0000-4000-8000-000000000002', status:'running', stage:'generating', attempt:1, elapsed:0 };
+  await click('[data-action="notes"]'); await set('#study-mode','ai'); await set('#notes',text); await submit('#notes-form'); await waitFor('document.querySelector(".source-preview") !== null'); await submit('#notes-form');
+  await waitFor('document.querySelector("#study-progress")?.textContent.includes("creando")'); await click('[data-action="cancel-study"]');
+  await waitFor('document.querySelector("#notes-form button[type=submit]")?.disabled === false');
+  assert.equal(await evaluate('document.querySelector("#notes").value'), text); await waitFor('document.querySelector("#notes-error").textContent.includes("cancelada")');
+  await delay(100); assert.equal(cancelledJob,true); await click('[data-action="close"]'); await cdp('Fetch.disable'); jobMock = null;
+  console.log('✓ Cancelación de IA: detiene la espera y conserva el material para continuar');
+  accountMock = { token:'a'.repeat(43), nickname:'Ana', account:{id:'test-account-id',email:'ana@example.invalid'}, progress:{...(await saved()),onboarded:true,tutorialSeen:false,coins:321} };
+  await cdp('Fetch.enable', {patterns:[{urlPattern:'*/api/auth/*'}, {urlPattern:'*/api/account/progress'}]});
+  await click('[data-action="account"]'); await click('[data-action="account-register"]');
+  await set('#account-name','Ana'); await set('#account-email','ana@example.invalid'); await set('#account-password','test-password-only'); await submit('#account-form');
+  await waitFor('document.querySelector("#modal-title").textContent.includes("Confirma")');
+  await click('[data-action="account-login"]'); await set('#account-email','ana@example.invalid'); await set('#account-password','test-password-only'); await submit('#account-form');
+  await waitFor('document.querySelector("#dialog").open === false'); assert.equal((await saved()).coins,321);
+  assert.ok(await evaluate('document.querySelector(".bottom-nav") !== null && document.querySelector(".tutorial") === null'), 'Una cuenta existente entra sin repetir la bienvenida');
+  await waitFor('document.querySelector(".habit") !== null'); await delay(1500);
+  assert.ok(progressWrites.some(p=>p.coins===321));
+  await click('[data-action="account"]'); assert.equal(await evaluate('document.querySelector(".account-email").textContent'),'ana@example.invalid'); await screenshot('mi-cuenta');
+  await click('[data-action="tutorial"]'); await click('[data-action="tutorial-next"]'); await click('[data-action="tutorial-next"]'); await click('[data-action="tutorial-next"]'); await click('[data-action="tutorial-next"]');
+  assert.equal((await saved()).tutorialSeen,true); assert.equal(await evaluate('document.querySelector("#dialog").open'),false);
+  await click('[data-action="account"]'); await click('[data-action="account-logout"]'); await waitFor('document.querySelectorAll(".pet-choice").length === 4'); await cdp('Fetch.disable');
+  console.log('✓ Correo: registro, confirmación, entrada sin tutorial, progreso sincronizado y cierre de sesión (servicio de cuenta controlado)');
   assert.deepEqual(errors, [], 'Errores de navegador');
   console.log('✓ Sin excepciones JavaScript ni errores de recursos');
   console.log(`Capturas en ${out}`);

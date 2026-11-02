@@ -1,4 +1,4 @@
-# Auditoría funcional de Winy · 0.3.0
+# Auditoría funcional de Winy · 0.4.0
 
 La revisión cubre navegación, progreso, documentos, generación de trivia, mapa, accesorios y salas entre dos clientes. Las mejoras se implementaron en el código y en el APK de esta rama.
 
@@ -6,6 +6,12 @@ La revisión cubre navegación, progreso, documentos, generación de trivia, map
 
 | Problema observado | Comportamiento implementado |
 | --- | --- |
+| Un jugador quedaba bloqueado por cinco intentos aunque solo se hubiera creado un juego. | El límite personal cuenta cinco juegos completados. Los intentos fallidos y el único reintento consumen el cupo global de llamadas al proveedor, con un código de error distinto. Los contadores de IA usan días UTC; los hábitos siguen el calendario local del dispositivo. |
+| El PDF parecía quedarse cargando y los fallos del proveedor aparecían como un 502 genérico. | Lectura con indicador de página y texto detectado, vista previa antes de consumir IA y tareas en segundo plano con avances y cancelación. El archivo extraído se conserva para reintentar. Ante un 502/503/504 del proveedor se intenta una vez más con el mismo modelo, sin pasar a un proveedor de pago. |
+| Se enviaba todo el material y se pedía una salida larga a Gemini. | Lectura rápida opcional con hasta 24.000 caracteres en extractos distribuidos, o completa hasta 80.000. Gemini 3 Flash usa razonamiento minimal, hasta seis preguntas y 4.096 tokens de salida. No se garantiza un tiempo real del proveedor: los intentos están limitados a 27 segundos y la tarea a 60 segundos. |
+| Un juego de apuntes solo permitía repetir una lista de preguntas. | Vista previa del tipo de juego, trivia, tarjetas con respuesta oculta y repaso mixto. Los errores quedan disponibles para practicar inmediatamente; los aciertos se programan para 1, 3, 7 y 14 días. Practicar de nuevo no hace otra llamada de IA y el repaso de errores no duplica premios. |
+| La bienvenida no explicaba el juego ni había acceso con correo. | Tutorial de cuatro pasos que se puede omitir y volver a ver. Registro e inicio de sesión con Supabase Auth, confirmación por correo y progreso privado mediante RLS. Las cuentas existentes entran directamente. Requiere configurar el proyecto real según la guía de cuentas. |
+| El pañuelo seguía pareciendo una pieza plana colocada sobre el pecho del cóndor. | Tela triangular con pliegues y costuras, trazada por especie. La silueta limita la tela y la ilustración original vuelve a dibujar por delante el collar de plumas, las alas, el pelo y las patas correspondientes. Hay vista previa sobre la mascota antes de comprar. |
 | Las variables estándar de Gemini podían quedar sin leer mientras seguía configurada la antigua clave de OpenAI. | Se admiten `GEMINI_API_KEY` y `GEMINI_MODEL`, además de los nombres con prefijo `WINY_`. Sin proveedor explícito, una clave de Gemini selecciona Gemini al arrancar. No hay cambio automático al proveedor de pago si falla la cuota. |
 | El mensaje de límite de IA confundía falta de saldo con saturación temporal. | Se distinguen clave inválida, modelo inaccesible, cuota gratuita no disponible, límite diario y exceso de solicitudes. No se devuelve al cliente el mensaje privado del proveedor. |
 | Si la primera consulta al servidor fallaba, el modo IA quedaba desactivado hasta reiniciar la app. | Se vuelve a comprobar al abrir los apuntes y al recuperar Internet. El botón Actualizar conexión permite recuperar la opción y el proveedor sin borrar el formulario. La consulta de estado admite hasta 60 segundos para el arranque del servidor. |
@@ -19,16 +25,16 @@ La revisión cubre navegación, progreso, documentos, generación de trivia, map
 
 ## Validación
 
-- `npm run check` y `npm test`: validaciones de sintaxis y 32 pruebas de lógica, API y proveedores con respuestas controladas. Incluyen una partida completa entre dos clientes concurrentes, tiempos, autenticación, cuotas, reintentos, migración del progreso y sellos.
-- `npm run test:browser`: recorrido en Chromium con documentos PDF, DOCX, PPTX y TXT generados para la prueba; mascota, misiones, recompensas, compras, dos clientes en una sala y persistencia. Incluye un temporizador real de 30 segundos y las cinco secciones a 320, 390, 600 y 1280 píxeles.
+- `npm run check` y `npm test`: validaciones de sintaxis de todos los módulos y 40 pruebas de lógica, API, cuentas y proveedores con respuestas controladas. Incluyen una partida completa entre dos clientes concurrentes, cinco fallos seguidos que no bloquean el cupo personal, cuotas globales, cancelación, deduplicación y privacidad de sesiones y progreso.
+- `npm run test:browser`: recorrido en Chromium con documentos PDF, DOCX, PPTX y TXT generados para la prueba; mascota, misiones, recompensas, compras, dos clientes en una sala y persistencia. Incluye tarjetas, repaso de errores, tutorial, acceso por correo, sincronización controlada, cancelación y un reintento de PDF que falla si se intenta leer el archivo por segunda vez. Comprueba un temporizador real de 30 segundos y las cinco secciones a 320, 390, 600 y 1280 píxeles.
 - `npm run build:apk`: compilación Android y Lint, verificación de firma y comparación de todos los recursos web incluidos con los archivos del proyecto.
 
 Las citas literales permiten revisar el respaldo de una pregunta; comprobar su presencia no demuestra por sí solo que toda la interpretación de la IA sea correcta. La pantalla de ideas conserva las fuentes para revisarlas.
 
 ## Límites de esta entrega
 
-El acceso desde este entorno a `winy.onrender.com` y al proveedor de IA está restringido por su política de red. La configuración real de Render y la cuota de Google deben confirmarse allí. `/api/status` informa proveedor, modelo y presencia de clave; `ai: true` no demuestra que haya cuota. La prueba definitiva consiste en generar un juego desde apuntes y revisar sus citas. No se ha realizado esa llamada con la clave del usuario.
+El acceso desde este entorno a `winy.onrender.com`, al proyecto de Supabase y al proveedor de IA está restringido por su política de red. Las capturas del usuario muestran Gemini configurado, una solicitud completada, errores 503 del proveedor y, después, el antiguo bloqueo de cinco intentos de Winy. Eso permite distinguir los fallos, pero no sustituye comprobar la nueva entrega desplegada. `/api/status` informa configuración; `ai: true` o `accounts: true` no demuestran por sí solos cuota, registro ni entrega de correo. No se ha realizado una llamada real con la clave del usuario desde este entorno.
 
 Las pruebas de salas usan dos clientes locales y el servidor real incluido. Falta comprobar el despliegue con dos teléfonos físicos. El APK se compila y verifica, pero no se ha ejecutado en un dispositivo Android desde este entorno; tampoco se ha identificado el nombre de la alerta antivirus que se reportó anteriormente.
 
-El progreso del juego permanece en el dispositivo. Las salas y sesiones anónimas usan SQLite: para conservarlas tras un despliegue se necesita un disco persistente en Render, como explica la [guía del servidor](ia-y-salas.md). La implementación actual está pensada para una instancia del servidor; no incluye cuentas con recuperación ni sincronización del pasaporte entre dispositivos.
+El progreso local se conserva y, al configurar Supabase, las cuentas pueden sincronizar una copia fuera de Render. Faltan las variables y el SQL del proyecto real: [guía de cuentas](cuentas.md). El correo público verificado depende de configurar el envío SMTP de Supabase. El guardado es una instantánea, sin mezclar partidas simultáneas de una misma cuenta. Las salas y sesiones de Winy siguen en SQLite y requieren persistencia para sobrevivir a reinicios sin volver a entrar; la implementación utiliza una instancia del servidor. Las tareas en curso se cancelan si ese proceso se reinicia.

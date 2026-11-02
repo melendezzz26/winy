@@ -1,10 +1,10 @@
 # Winy 🌱
 
-**[Descargar APK de prueba 0.3.0](https://github.com/melendezzz26/winy/raw/refs/heads/winy-apk-prueba/winy-debug.apk)** · [Configurar Gemini para pruebas](docs/gemini.md) · [Auditoría y mejoras](docs/auditoria.md) · [Configurar servidor](docs/ia-y-salas.md)
+**[Descargar APK de prueba 0.4.0](https://github.com/melendezzz26/winy/raw/refs/heads/winy-apk-prueba/winy-debug.apk)** · [Activar cuentas con Supabase](docs/cuentas.md) · [Configurar Gemini para pruebas](docs/gemini.md) · [Auditoría y mejoras](docs/auditoria.md) · [Configurar servidor](docs/ia-y-salas.md)
 
-Este APK incluye mapa geográfico, seis misiones con pasaporte, mascotas que responden al tocarlas y accesorios adaptados a cada especie. Se conecta a `https://winy.onrender.com`. Para usar la IA configura su clave en Render; no se incluyen claves en el APK. Las salas necesitan que el servidor esté activo.
+Este APK incluye tutorial que se puede omitir, repasos con trivia y tarjetas, mapa geográfico, seis misiones con pasaporte y pañuelos que siguen el cuerpo de cada mascota. Se conecta a `https://winy.onrender.com`. Para usar la IA configura su clave en Render; no se incluyen claves en el APK. Las salas necesitan que el servidor esté activo.
 
-Aplicación web móvil de hábitos y aprendizaje, creada a partir de las capturas del prototipo **Winy · Tu pequeña gran aventura**. Incluye cuatro compañeros peruanos, cinco secciones y progreso local. Las cuatro mascotas usan los PNG originales de `mascotas.zip`, con su transparencia y sin modificar los archivos. El logotipo SVG sigue siendo provisional.
+Aplicación web móvil de hábitos y aprendizaje, creada a partir de las capturas del prototipo **Winy · Tu pequeña gran aventura**. Incluye cuatro compañeros peruanos, cinco secciones y progreso local o vinculado a una cuenta. Las cuatro mascotas usan los PNG originales de `mascotas.zip`, con su transparencia y sin modificar los archivos. El logotipo SVG sigue siendo provisional.
 
 ## Ejecutar
 
@@ -22,24 +22,24 @@ El servidor escucha en el puerto **4173**. Para probarlo desde otro dispositivo 
 
 ## Qué funciona
 
-- **Bienvenida:** elegir cuy, llama, gallito de las rocas o cóndor, ponerle nombre y cambiar de compañero conservando progreso y accesorios.
+- **Bienvenida:** registro con correo y contraseña mediante Supabase, confirmación por correo, acceso directo para cuentas existentes y un tutorial de cuatro pasos que se puede omitir o volver a ver. También se puede jugar como invitado y elegir entre los cuatro compañeros.
 - **Hogar:** mascota que responde y se anima al tocarla, XP, niveles, monedas, trivia, tres hábitos y pasaporte de seis sellos. Cada hábito entrega una recompensa por día.
-- **Estudiar:** tres trivias con explicaciones; ejercicios para completar palabras a partir de apuntes; temporizador de 25 minutos, 5 minutos o 30 segundos. El temporizador continúa al cambiar de sección o recargar la página.
+- **Estudiar:** vista previa del texto extraído y elección de trivia, tarjetas o repaso mixto. Los errores quedan pendientes y los aciertos vuelven con intervalos de 1, 3, 7 y 14 días. Incluye tres trivias con explicaciones y ejercicios locales para completar palabras; temporizador de 25 minutos, 5 minutos o 30 segundos. El temporizador continúa al cambiar de sección o recargar la página.
 - **Aventura:** contorno geográfico de Perú de Natural Earth, seis destinos proyectados con sus coordenadas reales y selección sin recortar el país. Cada destino tiene tres preguntas propias; con dos aciertos se consigue un sello permanente, visible en el pasaporte y el mapa.
 - **Amigos:** salas entre dos clientes con código, temporizador y puntuación controlados por el servidor, más historial local de partidas. También se conserva el dúo por turnos en un solo teléfono.
-- **Estilo:** seis opciones, confirmación de compra, validación de saldo y accesorios vectoriales colocados según cada especie.
+- **Estilo:** seis opciones, vista previa sobre la mascota antes de comprar y validación de saldo. Los pañuelos tienen contornos, pliegues y costuras propios por especie, con el pelo, las alas y las plumas por delante de la tela.
 
-Las recompensas de trivia se calculan con la mejor puntuación de cada juego y día: 10 XP y 5 monedas por acierto. Si primero logras 1 y luego 3, recibes el premio de los 2 aciertos adicionales. Repetir o bajar la marca no duplica premios. Los guardados antiguos conservan las recompensas ya entregadas. Saludar a la mascota no entrega monedas. El cambio de fecha usa el calendario local del dispositivo. El progreso se guarda en `localStorage` del mismo navegador y origen: no hay cuentas, sincronización entre teléfonos ni recuperación en un servidor.
+Las recompensas de trivia se calculan con la mejor puntuación de cada juego y día: 10 XP y 5 monedas por acierto. Si primero logras 1 y luego 3, recibes el premio de los 2 aciertos adicionales. Repetir o bajar la marca no duplica premios. Los guardados antiguos conservan las recompensas ya entregadas. Saludar a la mascota no entrega monedas. El cambio de fecha usa el calendario local del dispositivo. El progreso se guarda en el dispositivo. Con Supabase configurado se puede entrar con correo, guardar una copia en la cuenta y cargarla desde otro teléfono. Consulta [la configuración de cuentas y sus límites](docs/cuentas.md). El repaso de errores no duplica premios.
 
 ## Estudiar con archivos
 
-En **Estudiar → Crear juego con mis archivos**, importa `examples/clase-fotosintesis.txt` o pega varios párrafos. Se aceptan hasta **5 archivos de 8 MB cada uno**:
+En **Estudiar → Crear juego con mis archivos**, revisa primero el texto leído y el tipo de juego, y luego prepara el repaso. Puedes importar `examples/clase-fotosintesis.txt` o pega varios párrafos. Se aceptan hasta **5 archivos de 8 MB cada uno**:
 
 - PDF con texto, hasta las primeras 40 páginas (PDF.js).
 - Word `.docx` y PowerPoint `.pptx`, hasta 80 diapositivas (fflate y extracción del XML).
 - TXT, Markdown y texto pegado.
 
-El modo local crea preguntas para completar una palabra y conserva la frase original como evidencia. El modo IA selecciona ideas clave, genera un resumen y crea trivia con citas que se verifican contra el texto. Este segundo modo requiere activar la API en el servidor. No se incluye OCR: los escaneos, PDF con contraseña, `.doc` y `.ppt` no se procesan. Se guardan hasta 10 juegos en el dispositivo, con sus ejercicios y citas.
+El modo local crea preguntas para completar una palabra y conserva la frase original como evidencia. El modo IA selecciona ideas clave, genera un resumen y crea trivia con citas que se verifican contra el texto. Este segundo modo requiere activar la API en el servidor. No se incluye OCR: los escaneos, PDF con contraseña, `.doc` y `.ppt` no se procesan. Se guardan hasta 10 juegos en el dispositivo, con sus ejercicios, citas y agenda de repaso. La lectura rápida usa hasta 24.000 caracteres en extractos distribuidos y avisa si omite contenido; el modo completo admite hasta 80.000 caracteres. La preparación con IA muestra avances, se puede cancelar y conserva el archivo extraído al reintentar. Cada juego creado permite practicar los tres modos sin nuevas llamadas a la IA.
 
 Consulta [cómo configurar la API, el modelo y las salas](docs/ia-y-salas.md). Se puede elegir **OpenAI (`gpt-5.4-mini`)** o **Gemini (`gemini-3.8-flash`)**. Para pruebas con cuota gratuita de Google sigue [la guía de Gemini](docs/gemini.md); la cuota depende de tu cuenta y del modelo.
 
@@ -58,7 +58,7 @@ Con el servidor iniciado y Chromium instalado:
 npm run test:browser
 ```
 
-La prueba usa Chrome DevTools Protocol, sin otro framework. Recorre bienvenida, mascota interactiva, hábitos, trivia completa, compras, misiones, pasaporte, sala con dos clientes, dúo, apuntes y lectura de PDF/DOCX/PPTX/TXT con archivos generados para la ejecución. Comprueba persistencia al recargar, mejora de recompensas, un temporizador real de 30 segundos, ausencia de errores JavaScript y desbordamiento en anchos de 320, 390, 600 y 1280 px. La interfaz de análisis usa una respuesta de servicio controlada; no demuestra que una clave real tenga cuota. Escribe capturas en `.local/` (ignorado por Git). `CHROMIUM` permite especificar el ejecutable y `WINY_TEST_URL` un servidor distinto.
+La prueba usa Chrome DevTools Protocol, sin otro framework. También recorre tutorial, acceso con correo, sincronización, tarjetas, repaso de errores y cancelación. Comprueba que reintentar un PDF no lo vuelva a leer. Recorre bienvenida, mascota interactiva, hábitos, trivia completa, compras, misiones, pasaporte, sala con dos clientes, dúo, apuntes y lectura de PDF/DOCX/PPTX/TXT con archivos generados para la ejecución. Comprueba persistencia al recargar, mejora de recompensas, un temporizador real de 30 segundos, ausencia de errores JavaScript y desbordamiento en anchos de 320, 390, 600 y 1280 px. La interfaz de análisis usa una respuesta de servicio controlada; no demuestra que una clave real tenga cuota. Escribe capturas en `.local/` (ignorado por Git). `CHROMIUM` permite especificar el ejecutable y `WINY_TEST_URL` un servidor distinto.
 
 ## Archivos
 
@@ -66,6 +66,9 @@ La prueba usa Chrome DevTools Protocol, sin otro framework. Recorre bienvenida, 
 - `web/styles.css`: diseño adaptable a teléfono y escritorio.
 - `web/core/state.js`: guardado, niveles, recompensas y compras.
 - `web/core/study.js`: creación de ejercicios con evidencia.
+- `web/core/study-flow.js`: lectura con avances, vista previa y preparación en segundo plano.
+- `web/core/review.js`: tarjetas, errores e intervalos de repaso.
+- `web/core/outfits.js`: tela y oclusión del pañuelo según la anatomía.
 - `web/core/documents.js`: lectores locales de documentos.
 - `web/core/data.js`: mascotas, accesorios, destinos y trivias.
 - `web/core/gameplay.js`: misiones, sellos y respuestas de los compañeros.

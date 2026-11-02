@@ -42,7 +42,11 @@ En Winy, selecciona **Ideas clave y trivia con IA** y prueba primero con dos o t
 - `ai_invalid_key`: revisa la clave en Render; no hace falta cambiar las sesiones del juego.
 - `ai_model_unavailable`: el identificador no está disponible para tu proyecto. Configura un modelo de texto con salida JSON admitido y con cuota disponible, según tu panel.
 
-Los límites propios de Winy siguen vigentes: cinco intentos por identidad y el cupo global diario. Los intentos fallidos también cuentan, para evitar reintentos ilimitados.
+Desde 0.4.0 el límite por jugador cuenta **cinco juegos completados al día**; los fallos no consumen esos cinco juegos. El cupo global `WINY_AI_DAILY_LIMIT` sí cuenta las llamadas al proveedor, incluidos fallos y el único reintento automático, porque pueden consumir la cuota de Google. Los juegos guardados se pueden repasar sin otra llamada de IA.
+
+Un `503 ServiceUnavailable` del panel de Google indica indisponibilidad del proveedor, mientras que un `429` puede indicar un límite. Winy devuelve códigos diferentes: `ai_provider_unavailable`, `ai_rate_limited`, `ai_daily_quota_exhausted`, `winy_daily_games_limit` y `winy_daily_requests_limit`. No conviene interpretar todos como falta de crédito.
+
+La generación usa tareas en segundo plano con estado y cancelación. Solo reintenta una vez ante HTTP 502/503/504; no reintenta cuota, clave inválida o modelo inaccesible. Gemini 3 Flash usa nivel de razonamiento `minimal`, hasta 6 preguntas y 4.096 tokens de salida, para reducir la espera. Cada intento tiene un máximo de 27 segundos y la tarea tiene un máximo de 60 segundos. La lectura del PDF ocurre antes y muestra la página que está leyendo.
 
 Los textos extraídos se envían a Google cuando eliges Gemini. Su tratamiento depende de las [condiciones de Gemini API](https://ai.google.dev/gemini-api/terms) y del plan que utilices. No se promete almacenamiento o tratamiento privado por el hecho de usar una cuota gratuita.
 

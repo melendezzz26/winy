@@ -1,4 +1,6 @@
 import { PETS } from './data.js';
+import { scarfLayers } from './outfits.js';
+let drawingId = 0;
 
 // The original PNGs stay unchanged. Bounds describe the visible artwork,
 // excluding almost transparent pixels in the supplied square canvases.
@@ -48,5 +50,9 @@ export function pet(petId = 'cuy', item = 'natural', cls = '') {
   anchors.tilt = art.scarfTilt;
   anchors.badgeSize = art.badgeSize;
   const name = PETS.find(p => p.id === id).name;
+  if (item === 'scarf') {
+    const layers = scarfLayers(id, art.file, `outfit-${++drawingId}`);
+    return `<div class="pet pet-${id} ${cls}"><svg class="pet-art" viewBox="0 0 240 280" role="img" aria-label="${name} con pañuelo de tela"><defs>${layers.defs}</defs><image href="assets/pets/${art.file}" x="${left}" y="${top}" width="${1254 * scale}" height="${1254 * scale}"/><g transform="translate(${left} ${top}) scale(${scale})"><g class="pet-accessory" aria-hidden="true">${layers.front}</g>${layers.foreground}</g></svg></div>`;
+  }
   return `<div class="pet pet-${id} ${cls}"><svg class="pet-art" viewBox="0 0 240 280" role="img" aria-label="${name}"><image href="assets/pets/${art.file}" x="${left}" y="${top}" width="${1254 * scale}" height="${1254 * scale}"/><g class="pet-accessory" aria-hidden="true">${accessory(anchors, item)}</g></svg></div>`;
 }

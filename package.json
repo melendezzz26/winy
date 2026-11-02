@@ -1,6 +1,6 @@
 {
   "name": "winy",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "private": true,
   "type": "module",
   "engines": {
@@ -11,7 +11,7 @@
     "test": "node --test tests/*.test.mjs",
     "test:browser": "node scripts/browser-test.mjs",
     "build:apk": "node scripts/build-apk.mjs",
-    "check": "node --check web/app.js && node --check web/core/state.js && node --check web/core/study.js && node --check web/core/pets.js && node --check web/core/map.js && node --check web/core/online.js && node --check web/core/gameplay.js && node --check server/api.mjs && node --check server/ai.mjs && node --check server/gemini.mjs",
+    "check": "node scripts/check.mjs",
     "postinstall": "node scripts/vendor.mjs"
   },
   "dependencies": {

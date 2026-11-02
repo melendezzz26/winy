@@ -83,3 +83,14 @@ test('las variables estándar de Gemini seleccionan Gemini sin llamar al proveed
     process.env.WINY_AI_PROVIDER='openai';assert.equal(createAI().provider,'openai');
   } finally { for(const n of names) {if(before[n]===undefined)delete process.env[n];else process.env[n]=before[n];} }
 });
+test('Gemini reintenta un 503 una sola vez, reserva cuota y reduce la generación para Flash', async () => {
+  let calls = 0, reserved = 0, body; const stages = [];
+  const ai = createAI({ provider: 'gemini', model: 'gemini-3.8-flash', key: 'test-only-key', transport: async (_url, options) => { calls++; body = JSON.parse(options.body); return calls === 1 ? { ok: false, status: 503, json: async () => ({}) } : { ok: true, json: async () => ({ candidates: [{ finishReason: 'STOP', content: { parts: [{ text: JSON.stringify(example()) }] } }] }) }; } });
+  const result = await ai.generate(sources, '', { retryDelayMs: 0, beforeRetry: () => { reserved++; }, onProgress: p => stages.push(p.stage) });
+  assert.equal(result.questions.length, 2); assert.equal(calls, 2); assert.equal(reserved, 1); assert.ok(stages.includes('retrying')); assert.ok(stages.includes('validating'));
+  assert.equal(body.generationConfig.maxOutputTokens, 4096); assert.equal(body.generationConfig.thinkingConfig.thinkingLevel, 'minimal');
+  calls = 0;
+  const down = createAI({ provider: 'gemini', key: 'test-only-key', transport: async () => { calls++; return { ok: false, status: 503, json: async () => ({ error: { message: 'private-message' } }) }; } });
+  await assert.rejects(down.generate(sources, '', { retryDelayMs: 0 }), e => e.status === 503 && e.code === 'ai_provider_unavailable' && !e.message.includes('private-message'));
+  assert.equal(calls, 2);
+});

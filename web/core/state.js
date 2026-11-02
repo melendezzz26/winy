@@ -1,10 +1,11 @@
 import { PETS, ITEMS, DESTINATIONS } from './data.js';
+import { restoreReviews } from './review.js';
 export const STORAGE_KEY = 'winy.v1';
 export function today(date = new Date()) {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
 }
 export function initialState() {
-  return { version: 1, onboarded: false, pet: 'cuy', names: Object.fromEntries(PETS.map(p => [p.id, p.defaultName])), xp: 0, coins: 90, owned: ['natural'], equipped: 'natural', habits: {}, rewards: {}, bestScores: {}, passport: {}, visited: [], games: [], matches: [], focus: null };
+  return { version: 1, onboarded: false, tutorialSeen: false, savedAt: 0, pet: 'cuy', names: Object.fromEntries(PETS.map(p => [p.id, p.defaultName])), xp: 0, coins: 90, owned: ['natural'], equipped: 'natural', habits: {}, rewards: {}, bestScores: {}, passport: {}, reviews: {}, visited: [], games: [], matches: [], focus: null };
 }
 export function restoreState(raw) {
   const base = initialState();
@@ -16,6 +17,9 @@ export function restoreState(raw) {
     if (!owned.includes('natural')) owned.unshift('natural');
     const names = Object.fromEntries(PETS.map(p => [p.id, typeof s.names?.[p.id] === 'string' && s.names[p.id].trim() ? s.names[p.id].trim().slice(0, 28) : p.defaultName]));
     return { ...base, onboarded: s.onboarded === true, pet, names, owned,
+      tutorialSeen: s.tutorialSeen === true || (s.tutorialSeen === undefined && s.onboarded === true),
+      savedAt: Number.isFinite(s.savedAt) && s.savedAt >= 0 ? s.savedAt : 0,
+      reviews: restoreReviews(s.reviews),
       equipped: owned.includes(s.equipped) ? s.equipped : 'natural',
       xp: Number.isSafeInteger(s.xp) && s.xp >= 0 ? s.xp : 0,
       coins: Number.isSafeInteger(s.coins) && s.coins >= 0 ? s.coins : 90,
@@ -24,7 +28,7 @@ export function restoreState(raw) {
       bestScores: Object.fromEntries(Object.entries(s.bestScores && typeof s.bestScores === 'object' ? s.bestScores : {}).filter(([k, v]) => /^\d{4}-\d{2}-\d{2}:/.test(k) && Number.isSafeInteger(v) && v >= 0 && v <= 1000).slice(-200)),
       passport: Object.fromEntries(Object.entries(s.passport && typeof s.passport === 'object' ? s.passport : {}).filter(([id, v]) => DESTINATIONS.some(d => d.id === id) && v && Number.isFinite(v.earnedAt) && Number.isInteger(v.score) && v.total === 3 && v.score >= 2 && v.score <= 3)),
       visited: Array.isArray(s.visited) ? s.visited.filter(x => typeof x === 'string').slice(-100) : [],
-      games: Array.isArray(s.games) ? s.games.filter(g => g && typeof g.title === 'string' && Array.isArray(g.questions) && g.questions.length && g.questions.every(q => q && typeof q.prompt === 'string' && typeof q.evidence === 'string' && (typeof q.expected === 'string' || (Array.isArray(q.options) && q.options.length === 3 && q.options.every(o => typeof o === 'string') && Number.isInteger(q.answer) && q.answer >= 0 && q.answer < 3)))).slice(-10) : [],
+      games: Array.isArray(s.games) ? s.games.filter(g => g && typeof g.id === 'string' && !['__proto__', 'constructor', 'prototype'].includes(g.id) && typeof g.title === 'string' && Array.isArray(g.questions) && g.questions.length && g.questions.every(q => q && typeof q.prompt === 'string' && typeof q.evidence === 'string' && (typeof q.expected === 'string' || (Array.isArray(q.options) && q.options.length === 3 && q.options.every(o => typeof o === 'string') && Number.isInteger(q.answer) && q.answer >= 0 && q.answer < 3)))).slice(-10) : [],
       matches: Array.isArray(s.matches) ? s.matches.filter(m => m && typeof m.code === 'string' && typeof m.opponent === 'string' && Number.isInteger(m.mine) && Number.isInteger(m.theirs) && Number.isFinite(m.played)).slice(-20) : [],
       focus: s.focus && Number.isFinite(s.focus.endsAt) && Number.isFinite(s.focus.remaining) && s.focus.remaining >= 0 && [30, 300, 1500].includes(s.focus.duration) ? s.focus : null
     };

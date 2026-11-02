@@ -16,8 +16,8 @@ La coincidencia literal de la cita no garantiza por sí sola que una pregunta se
 
 1. Crea o abre una cuenta en [OpenAI Platform](https://platform.openai.com/), crea un proyecto para Winy y activa su facturación según lo que quieras gastar. La suscripción a ChatGPT y el uso de la API se facturan por separado.
 2. En el proyecto de OpenAI, crea una clave de API. Guárdala en el gestor de secretos del alojamiento como **`WINY_AI_KEY`**. **No la envíes por chat, no la subas a GitHub y no la pongas en el APK.**
-3. Configura **`WINY_AI_MODEL=gpt-5.4-mini`** y un límite de intentos diarios **`WINY_AI_DAILY_LIMIT=20`**, o uno menor durante tus pruebas. Además hay un máximo de cinco análisis por identidad al día. Los intentos fallidos también consumen ese cupo, para limitar reintentos. El límite es compartido por la única instancia del servidor; configura también los controles de gasto disponibles en el proyecto de OpenAI.
-4. Ejecuta el servidor de Winy en un alojamiento con **Node.js 24.5 o superior**, HTTPS y un disco persistente para SQLite. Puede ser un servicio Node con volumen en Render, Railway o tu propio servidor. El coste del alojamiento depende del proveedor; aún no se ha elegido ni desplegado uno.
+3. Configura **`WINY_AI_MODEL=gpt-5.4-mini`** y un límite de intentos diarios **`WINY_AI_DAILY_LIMIT=20`**, o uno menor durante tus pruebas. Además hay un máximo de cinco juegos completados por jugador al día. Los fallos no consumen esos cinco juegos; sí consumen el cupo global de solicitudes al proveedor. El límite es compartido por la única instancia del servidor; configura también los controles de gasto disponibles en el proyecto de OpenAI.
+4. Ejecuta el servidor de Winy en un alojamiento con **Node.js 24.5 o superior**, HTTPS y un disco persistente para SQLite. Puede ser un servicio Node con volumen en Render, Railway o tu propio servidor. El servidor configurado para esta entrega es `https://winy.onrender.com`; el coste y la persistencia del alojamiento dependen de tu plan.
 5. Cuando tengas la dirección HTTPS del servicio, compila el APK con **`WINY_API_BASE`** apuntando a ese origen. Ejemplo ilustrativo: `https://winy.tu-dominio.com`. Ese valor es público y no contiene ninguna clave.
 
 Para comprobar la selección de contenido, trae dos documentos representativos de tus cursos y señala qué temas consideras importantes. Así podremos evaluar el resumen, las preguntas, las citas y el coste real por análisis.
@@ -77,13 +77,13 @@ Si compilas sin `WINY_API_BASE`, las funciones locales siguen disponibles y el A
 
 Un jugador crea una sala con su nombre y tema, comparte el código de seis caracteres y el segundo entra desde su teléfono. El anfitrión inicia cuando ambos están presentes. Cada ronda dura 30 segundos; la respuesta correcta se revela al contestar ambos o al agotarse el tiempo. El servidor decide el resultado y evita contabilizar dos veces una respuesta. La aplicación consulta cambios cada segundo.
 
-La identidad es anónima y se guarda con un token privado en el dispositivo; no hay inicio de sesión por correo ni recuperación de cuenta en esta versión. Las salas caducan a las dos horas. El historial de partidas se guarda en cada dispositivo; el progreso y las monedas locales todavía no se sincronizan entre dispositivos. El modo de dos jugadores en un solo teléfono sigue disponible por separado.
+Se puede jugar como invitado con un token privado o entrar con una cuenta de correo mediante [Supabase](cuentas.md). Las salas caducan a las dos horas. Con una cuenta se puede sincronizar el progreso, los repasos y el historial; las sesiones locales y las salas siguen usando SQLite. El modo de dos jugadores en un solo teléfono sigue disponible por separado.
 
 ## Tratamiento de documentos
 
 Los lectores locales extraen texto. En modo IA, ese texto y los nombres de las fuentes se envían al servidor y al proveedor seleccionado: OpenAI o Google Gemini. No se sube el PDF/DOCX/PPTX binario. El servidor conserva el juego generado, su resumen y las citas; no guarda el texto completo enviado. A OpenAI se solicita `store: false`; el tratamiento de cada proveedor sigue las políticas de datos aplicables a tu plan. Los escaneos siguen necesitando OCR o texto pegado: esta entrega no añade OCR.
 
-Se aceptan hasta 80.000 caracteres por análisis. El análisis sin conexión anterior permanece como opción explícita para completar palabras; no se presenta como IA ni se usa para fingir una respuesta si el proveedor falla.
+La vista previa permite lectura rápida de extractos distribuidos de hasta 24.000 caracteres o análisis completo de hasta 80.000. `POST /api/study` con `background: true` devuelve una tarea; `GET /api/study/jobs/:id` muestra el estado y `POST /api/study/jobs/:id/cancel` cancela. Se conserva el formato síncrono de la API para los clientes anteriores. El análisis sin conexión anterior permanece como opción explícita para completar palabras; no se presenta como IA ni se usa para fingir una respuesta si el proveedor falla.
 
 ## Si OpenAI devuelve un límite o un error
 
@@ -95,6 +95,6 @@ La clave de API identifica tu proyecto; crearla no garantiza que tenga saldo o c
 - **`ai_invalid_key`:** revisa el secreto `WINY_AI_KEY` del servidor. Nunca lo envíes al chat ni lo incluyas en el APK.
 - **`ai_model_unavailable` / `ai_access_denied`:** revisa el modelo configurado, permisos y posibles requisitos de verificación del proyecto.
 
-Los límites propios de Winy (cinco análisis por identidad y el límite global diario) tienen mensajes distintos. Se siguen contando los intentos fallidos para limitar reintentos.
+Los límites propios de Winy tienen mensajes distintos: cinco juegos completados por jugador (`winy_daily_games_limit`) y un cupo global de solicitudes (`winy_daily_requests_limit`). Los intentos fallidos y los reintentos solo consumen el segundo.
 
 Winy incluye adaptadores para OpenAI y Gemini. Se seleccionan con `WINY_AI_PROVIDER`. Un nombre de modelo de Google en `WINY_AI_MODEL` no cambia de proveedor: Gemini usa `WINY_GEMINI_MODEL` y `WINY_GEMINI_KEY`, según [su guía de configuración](gemini.md).

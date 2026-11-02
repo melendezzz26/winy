@@ -11,7 +11,7 @@ async function fixture(t, overrides = {}) {
   const api = createApi({ dbPath: ':memory:', ai: { enabled: false }, clock: () => time, ...overrides });
   const server = http.createServer(api.handle); server.listen(0, '127.0.0.1'); await once(server, 'listening');
   const base = `http://127.0.0.1:${server.address().port}`;
-  t.after(async () => { server.closeAllConnections(); await new Promise(resolve => server.close(resolve)); api.close(); });
+  t.after(async () => { server.closeAllConnections(); await new Promise(resolve => server.close(resolve)); await api.close(); });
   const call = async (path, token, data) => { const response = await fetch(base + '/api' + path, { method: data ? 'POST' : 'GET', headers: { ...(data ? { 'Content-Type': 'application/json' } : {}), ...(token ? { Authorization: 'Bearer ' + token } : {}) }, body: data ? JSON.stringify(data) : undefined }); return { status: response.status, body: await response.json() }; };
   const player = async nickname => (await call('/players', null, { nickname })).body.token;
   return { base, call, player, tick: n => { time += n; } };
@@ -66,7 +66,7 @@ test('los errores de cuota del proveedor llegan al cliente sin invalidar la sesi
 });
 test('el estado informa el proveedor y el modelo incluso si falta configurar su clave', async t => {
   const f=await fixture(t,{ai:{enabled:false,provider:'gemini',model:'gemini-3.8-flash'}});
-  const response=await f.call('/status');assert.equal(response.status,200);assert.deepEqual(response.body,{online:true,ai:false,provider:'gemini',model:'gemini-3.8-flash'});
+  const response=await f.call('/status');assert.equal(response.status,200);assert.deepEqual(response.body,{online:true,ai:false,provider:'gemini',model:'gemini-3.8-flash',accounts:false});
 });
 test('JSON inválido y fuentes malformadas se rechazan antes de gastar solicitudes de IA', async t => {
   let calls = 0;
@@ -76,10 +76,39 @@ test('JSON inválido y fuentes malformadas se rechazan antes de gastar solicitud
     const response = await fetch(f.base + '/api/study', { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token }, body: raw });
     assert.equal(response.status, 400); assert.match((await response.json()).error, /no válidos/);
   }
-  for (const sources of [[null], [[]], [{}], [{ text: 3 }], Array(402).fill({ text: 'Texto de clase' })]) {
+  for (const sources of [[null], [[]], [{}], [{ text: 3 }], Array(1204).fill({ text: 'Texto de clase' })]) {
     assert.equal((await f.call('/study', token, { sources })).status, 400);
   }
   assert.equal(calls, 0);
   const input = { sources: [{ text: 'Una explicación suficiente para analizar. '.repeat(12) }] };
   assert.equal((await f.call('/study', token, input)).status, 201); assert.equal(calls, 1);
+});
+test('cinco fallos del proveedor no se confunden con cinco juegos completados', async t => {
+  let calls = 0;
+  const f = await fixture(t, { ai: { enabled: true, generate: async () => { calls++; if (calls <= 5) throw new AIServiceError('El proveedor está temporalmente ocupado.', 503, 'ai_provider_unavailable'); return { id: 'game-' + calls, title: 'Clase' }; } } });
+  const token = await f.player('Ana'), input = { sources: [{ text: 'Un párrafo explicativo sobre un tema de clase. '.repeat(10) }] };
+  for (let i = 0; i < 5; i++) assert.equal((await f.call('/study', token, input)).body.code, 'ai_provider_unavailable');
+  for (let i = 0; i < 5; i++) assert.equal((await f.call('/study', token, input)).status, 201);
+  const limited = await f.call('/study', token, input);
+  assert.equal(limited.status, 429); assert.equal(limited.body.code, 'winy_daily_games_limit'); assert.equal(calls, 10);
+});
+test('un análisis en segundo plano muestra avances, deduplica solicitudes y protege el resultado', async t => {
+  let resolve, calls = 0;
+  const f = await fixture(t, { ai: { enabled: true, generate: async (_sources, _topic, context) => { calls++; context.onProgress({ stage: 'retrying', attempt: 2 }); return new Promise(done => { resolve = done; }); } } });
+  const a = await f.player('Ana'), b = await f.player('Luis'), input = { sources: [{ text: 'Un párrafo explicativo sobre un tema de clase. '.repeat(10) }], background: true };
+  const started = await f.call('/study', a, input); assert.equal(started.status, 202);
+  assert.equal((await f.call('/study', a, input)).body.id, started.body.id); assert.equal(calls, 1);
+  const url = '/study/jobs/' + started.body.id;
+  assert.equal((await f.call(url, b)).status, 410);
+  assert.equal((await f.call(url, a)).body.stage, 'retrying');
+  resolve({ id: 'finished', title: 'Clase', questions: [] });
+  const result = await f.call(url, a); assert.equal(result.body.status, 'completed'); assert.equal(result.body.game.id, 'finished');
+  assert.equal((await f.call('/study', a, input)).body.id, started.body.id); assert.equal(calls, 1, 'Reutilizar un resultado reciente no debe consumir otra llamada');
+});
+test('cancelar un análisis detiene la llamada y no guarda un resultado tardío', async t => {
+  const f = await fixture(t, { ai: { enabled: true, generate: async (_s, _t, { signal }) => new Promise((_, reject) => signal.addEventListener('abort', () => reject(signal.reason), { once: true })) } });
+  const token = await f.player('Ana'), input = { sources: [{ text: 'Un párrafo explicativo sobre un tema de clase. '.repeat(10) }], background: true };
+  const job = (await f.call('/study', token, input)).body;
+  await f.call(`/study/jobs/${job.id}/cancel`, token, {});
+  assert.equal((await f.call(`/study/jobs/${job.id}`, token)).body.status, 'cancelled');
 });

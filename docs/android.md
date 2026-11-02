@@ -2,7 +2,7 @@
 
 El proyecto `android/` empaqueta el juego disponible en `web/` dentro de un WebView. Incluye las mascotas originales, fuentes y lectores de documentos. Los modos locales funcionan sin servidor; la IA y las salas entre teléfonos requieren el servidor HTTPS configurado. Consulta [cómo activar esos servicios](ia-y-salas.md).
 
-El APK 0.3.0 de esta rama apunta a `https://winy.onrender.com`. El proveedor se selecciona en Render; admite OpenAI y Google Gemini sin incluir sus claves en el APK. Si encuentra `GEMINI_API_KEY` y no hay un proveedor explícito, selecciona Gemini.
+El APK 0.4.0 de esta rama apunta a `https://winy.onrender.com`. El proveedor se selecciona en Render; admite OpenAI y Google Gemini sin incluir sus claves en el APK. Si encuentra `GEMINI_API_KEY` y no hay un proveedor explícito, selecciona Gemini.
 
 ## Instalar el APK de prueba
 
@@ -14,12 +14,16 @@ Es un APK de desarrollo con identificador `pe.winy.app.debug`; no es una publica
 
 El progreso se guarda en el almacenamiento privado de la aplicación. Se mantiene al cerrar o actualizar con el mismo identificador y la misma firma. Se pierde si borras los datos o desinstalas la aplicación. La clave local de pruebas `.local/winy-debug.keystore` debe conservarse para poder instalar futuras actualizaciones encima de esta versión; no es una clave de publicación.
 
+Las cuentas con correo se activan con [Supabase](cuentas.md), sin modificar el APK.
+
 ## Recorrido de prueba en el teléfono
 
+- Revisar u omitir el tutorial; registrarse, confirmar correo y entrar directamente con una cuenta existente.
 - Elegir y nombrar las cuatro mascotas; cambiar de compañero conservando monedas, nivel y accesorios.
 - Tocar a la mascota para ver sus respuestas y animación. No debe cambiar el saldo.
 - Completar una trivia, revisar explicaciones y comprobar que mejorar la marca entrega la diferencia de recompensas; repetirla con igual puntuación no paga otra vez.
 - Completar los hábitos de comida y pausa. Iniciar el temporizador de 30 segundos, cambiar de sección o cerrar y volver a abrir la aplicación, y revisar el hábito de enfoque.
+- Crear tarjetas o un repaso mixto, fallar un concepto y volver a practicarlo desde Repasar mis errores.
 - Cargar TXT, Markdown, PDF con texto, DOCX y PPTX desde el selector nativo; revisar la evidencia de los ejercicios. Un escaneo o un documento con contraseña debe mostrar un error legible.
 - Elegir los seis destinos en el mapa y abrir sus retos propios. Conseguir dos de tres aciertos para ganar un sello; volver al Hogar o reiniciar para comprobar el pasaporte guardado.
 - Con el servidor configurado, crear una sala y entrar con el código desde otro teléfono; comprobar inicio, cuatro rondas y resultado. Probar también el dúo en un mismo teléfono.
