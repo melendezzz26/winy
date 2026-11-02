@@ -1,6 +1,6 @@
 # Winy 🌱
 
-**[Descargar APK de prueba 0.7.0](https://github.com/melendezzz26/winy/raw/refs/heads/winy-apk-prueba/winy-debug.apk)** · [Exámenes entre compañeros](docs/examenes-compartidos.md) · [Activar cuentas con Supabase](docs/cuentas.md) · [Activar Groq como respaldo](docs/groq.md) · [Configurar Gemini para pruebas](docs/gemini.md) · [Auditoría de aprendizaje 15–16 años](docs/auditoria-aprendizaje.md) · [Auditoría funcional](docs/auditoria.md) · [Configurar servidor](docs/ia-y-salas.md)
+**[Descargar APK de prueba 0.7.0](https://github.com/melendezzz26/winy/raw/refs/heads/winy-apk-prueba/winy-debug.apk)** · [Exámenes entre compañeros](docs/examenes-compartidos.md) · [Propuesta de mundo y mascota](docs/mundo-y-companero.md) · [Activar cuentas con Supabase](docs/cuentas.md) · [Activar Groq como respaldo](docs/groq.md) · [Configurar Gemini para pruebas](docs/gemini.md) · [Auditoría de aprendizaje 15–16 años](docs/auditoria-aprendizaje.md) · [Auditoría funcional](docs/auditoria.md) · [Configurar servidor](docs/ia-y-salas.md)
 
 Este APK permite preparar hasta 20 preguntas y compartir un repaso de examen en una sala para dos teléfonos. Incluye Pomodoro con metas y descansos, explicación con palabras propias, repaso de errores y dudas, tutorial que se puede omitir, trivia y tarjetas, mapa geográfico, seis misiones con pasaporte y pañuelos que siguen el cuerpo de cada mascota. Se conecta a `https://winy.onrender.com`. Para usar la IA configura su clave en Render; no se incluyen claves en el APK. Las salas necesitan que el servidor esté activo.
 
