@@ -1,5 +1,7 @@
 # Auditoría de aprendizaje · Winy 0.6.0
 
+La entrega posterior 0.7.0 incorpora [hasta veinte preguntas y exámenes entre compañeros](examenes-compartidos.md).
+
 Revisión del código y del recorrido de estudio para adolescentes de **15 y 16 años**, realizada el 2 de noviembre de 2026. Incluye cambios implementados, comprobaciones técnicas y propuestas pendientes. No es una evaluación con estudiantes ni una demostración de mejores notas.
 
 ## Hallazgo principal

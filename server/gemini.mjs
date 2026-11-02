@@ -1,5 +1,6 @@
 import { requestModel } from './inference.mjs';
-import { teachingInstructions } from './teaching.mjs';
+import { studyInstructions } from './teaching.mjs';
+import { outputBudget } from '../web/core/question-count.js';
 import { randomUUID } from 'node:crypto';
 import { analysisSources } from './citations.mjs';
 const FIELD_RULES = [
@@ -36,9 +37,9 @@ export function createGemini({ key, model, transport, schema, validateAnalysis, 
     async generate(sources, topic, context = {}) {
       if (!key) throw new ServiceError('El análisis con Gemini aún no está activado. Configura WINY_GEMINI_KEY en el servidor.', 503, 'ai_not_configured');
       const payload = {
-          systemInstruction: { parts: [{ text: teachingInstructions }] },
+          systemInstruction: { parts: [{ text: studyInstructions(context.questionCount) }] },
           contents: [{ role: 'user', parts: [{ text: JSON.stringify({ topic, sources: analysisSources(sources) }) }] }],
-          generationConfig: { responseMimeType: 'application/json', responseJsonSchema: schema, maxOutputTokens: 4096, ...(/^gemini-3[.\w-]*flash/.test(model) ? { thinkingConfig: { thinkingLevel: 'MINIMAL' } } : {}) }
+          generationConfig: { responseMimeType: 'application/json', responseJsonSchema: schema, maxOutputTokens: outputBudget(context.questionCount), ...(/^gemini-3[.\w-]*flash/.test(model) ? { thinkingConfig: { thinkingLevel: 'MINIMAL' } } : {}) }
       };
       // Retain only a safe classification in logs, never Google's raw message,
       // document contents, names, account identifiers or credential values.
@@ -67,7 +68,7 @@ export function createGemini({ key, model, transport, schema, validateAnalysis, 
       const output = (candidate.content?.parts || []).filter(p => !p.thought && typeof p.text === 'string').map(p => p.text).join('');
       let result;
       try { result = JSON.parse(output); } catch { throw new ServiceError('Gemini no devolvió un análisis válido. Inténtalo de nuevo.', 502, 'ai_invalid_output'); }
-      try { return validateAnalysis(result, sources); }
+      try { return validateAnalysis(result, sources, context.questionCount); }
       catch (error) { throw new ServiceError(error.message, 422, 'ai_invalid_output'); }
     }
   };

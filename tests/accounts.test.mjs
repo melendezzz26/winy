@@ -35,6 +35,11 @@ test('registro, entrada en dos dispositivos, progreso privado y cierre de una se
   await call('/account/progress', { user_id: 'user-luis', progress: { ...state, coins: 400, password: 'must-not-be-stored' } }, a.token);
   assert.equal(writes[0][0], 'user-ana'); assert.equal(writes[0][1], 'test-provider-access'); assert.equal(writes[0][2].coins, 400); assert.equal(writes[0][2].password, undefined);
   assert.equal((await call('/account/progress', null, b.token)).body.progress, null);
+  const large = { ...state, games: Array.from({ length: 10 }, (_, g) => ({ id: 'exam-' + g, title: 'Examen ' + g, questions: Array.from({ length: 20 }, (_, q) => ({ prompt: `Pregunta ${q}: ¿cómo transforma la energía una planta según los procesos explicados en clase?`, options: ['Transforma energía luminosa en química.', 'Transforma solamente energía térmica.', 'No interviene en el intercambio de energía.'], answer: 0, explanation: 'La fotosíntesis utiliza energía luminosa para producir sustancias que contienen energía química. '.repeat(5), evidence: 'La fotosíntesis transforma energía luminosa en energía química en las plantas. '.repeat(4), source: 'Clase de biología' })) })) };
+  assert.ok(Buffer.byteLength(JSON.stringify(large)) > 180000, 'Una biblioteca de veinte preguntas por examen supera el antiguo límite');
+  assert.equal((await call('/account/progress', { progress: large }, a.token)).status, 200);
+  assert.equal(writes.at(-1)[2].games.length, 10); assert.equal(writes.at(-1)[2].games[0].questions.length, 20);
+  assert.equal((await call('/account/progress', { progress: { ...state, extra: 'ñ'.repeat(225001) } }, a.token)).status, 400, 'El límite se cuenta en bytes UTF-8');
   await call('/auth/logout', {}, a.token); assert.equal((await call('/auth/me', null, a.token)).status, 401);
   assert.equal((await call('/auth/me', null, second.token)).status, 200);
 });

@@ -42,14 +42,14 @@ export async function identify(nickname) {
   rememberIdentity();
   return identity;
 }
-export async function analyze(sources, topic, nickname, { signal, onProgress } = {}) {
+export async function analyze(sources, topic, nickname, { signal, onProgress, questionCount = 12 } = {}) {
   await identify(nickname);
   const account = currentAccount();
   let job;
-  try { job = await request('/study', { method: 'POST', data: { sources, topic, background: true }, signal }); }
-  catch (error) { if (error.status !== 401 || account) throw error; await identify(nickname); job = await request('/study', { method: 'POST', data: { sources, topic, background: true }, signal }); }
+  try { job = await request('/study', { method: 'POST', data: { sources, topic, questionCount, background: true }, signal }); }
+  catch (error) { if (error.status !== 401 || account) throw error; await identify(nickname); job = await request('/study', { method: 'POST', data: { sources, topic, questionCount, background: true }, signal }); }
   if (job.questions) return job; // Compatible with the previous deployed API.
-  const deadline = Date.now() + 70000;
+  const deadline = Date.now() + (questionCount === 20 ? 135000 : questionCount === 12 ? 105000 : 75000);
   const cancel = () => { request(`/study/jobs/${job.id}/cancel`, { method: 'POST', data: {} }).catch(() => {}); };
   signal?.addEventListener('abort', cancel, { once: true });
   try {

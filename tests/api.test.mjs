@@ -48,6 +48,57 @@ test('el servidor hace cumplir el tiempo, la autenticación y la caducidad de sa
   assert.equal((await f.call(`/rooms/${code}/answer`, a, { round: 0, answer: 0 })).status, 409);
   f.tick(7200001); assert.equal((await f.call(`/rooms/${code}`, a)).status, 410);
 });
+test('dos usuarios estudian su examen completo, revisan juntos y reciben solo sus resultados al terminar', async t => {
+  const f = await fixture(t), a = await f.player('Ana'), b = await f.player('Luis'), outsider = await f.player('Fuera');
+  const questions = Array.from({ length: 12 }, (_, i) => ({ prompt: `Pregunta ${i} de mi examen`, options: ['Uno', 'Dos', 'Tres'], answer: i % 3, explanation: `La idea ${i} está explicada en clase.`, evidence: `Esta es la cita literal de la idea ${i} del material del examen.`, source: 'Mi clase.txt' }));
+  questions[1] = { prompt: 'La ________ transforma la energía.', expected: 'fotosíntesis', evidence: 'La fotosíntesis transforma la energía.', source: 'Mi clase.txt' };
+  const create = await f.call('/rooms', a, { game: { title: 'Examen de biología', questions }, roundSeconds: 90 });
+  assert.equal(create.status, 201); assert.equal(create.body.total, 12); assert.equal(create.body.game, undefined); assert.equal(create.body.custom, true);
+  const code = create.body.code, url = `/rooms/${code}`;
+  assert.equal((await f.call(url, outsider)).status, 403);
+  await f.call(url + '/join', b, {}); let current = (await f.call(url + '/start', a, {})).body;
+  assert.equal(current.deadline - current.serverTime, 90000);
+  for (let round = 0; round < 12; round++) {
+    assert.equal(current.round, round); assert.equal(current.game, undefined); assert.equal(current.feedback, undefined);
+    assert.equal(current.question.answer, undefined); assert.equal(current.question.expected, undefined); assert.equal(current.question.evidence, undefined);
+    const right = round === 1 ? 'FOTOSINTESIS' : round % 3;
+    if (round === 1) {
+      assert.equal(current.question.type, 'cloze');
+      assert.equal((await f.call(url + '/answer', b, { round, answer: 'x'.repeat(101) })).status, 400);
+    }
+    await Promise.all([f.call(url + '/answer', a, { round, answer: right }), f.call(url + '/answer', b, { round, answer: round === 1 ? 'otra' : (right + 1) % 3 })]);
+    const revealed = (await f.call(url, a)).body;
+    assert.equal(revealed.feedback.correct, true); assert.equal(revealed.feedback.evidence, questions[round].evidence); assert.equal(revealed.deadline, 0);
+    f.tick(120000); assert.equal((await f.call(url, b)).body.phase, 'reveal', 'La explicación espera a los dos jugadores');
+    await f.call(url + '/next', a, { round });
+    assert.equal((await f.call(url, b)).body.phase, 'reveal');
+    await f.call(url + '/next', a, { round }); // Readiness is idempotent.
+    current = (await f.call(url + '/next', b, { round })).body;
+    assert.equal((await f.call(url + '/next', a, { round })).status, 409, 'Una petición tardía no salta la ronda siguiente');
+  }
+  assert.equal(current.phase, 'finished'); assert.equal(current.game.questions.length, 12);
+  assert.equal(current.results.filter(r => r.correct).length, 0); assert.equal(current.players[0].score, 12);
+  const host = (await f.call(url, a)).body; assert.equal(host.results.filter(r => r.correct).length, 12);
+  assert.equal((await f.call(url, outsider)).status, 403);
+});
+test('las salas rechazan bancos o ajustes inválidos y no convierten el archivo completo en datos públicos', async t => {
+  const f = await fixture(t), a = await f.player('Ana');
+  const game = { title: 'Examen', questions: [0, 1].map(i => ({ prompt: `Pregunta ${i}`, expected: 'luz', evidence: 'La planta necesita luz para crecer.', source: 'Clase' })) };
+  for (const bad of [null, { ...game, questions: [] }, { ...game, questions: Array(21).fill(game.questions[0]) }, { ...game, questions: [game.questions[0], { prompt: 'Incompleta' }] }]) assert.equal((await f.call('/rooms', a, { game: bad })).status, 400);
+  assert.equal((await f.call('/rooms', a, { game, roundSeconds: 1 })).status, 400);
+  assert.equal((await f.call('/rooms', a, { game, questionCount: 21 })).status, 400);
+  const room = await f.call('/rooms', a, { game: { ...game, originalFile: 'private raw file', notes: 'private notes' } });
+  assert.equal(room.status, 201); assert.equal(JSON.stringify(room.body).includes('private'), false);
+});
+test('la cantidad de preguntas se valida antes de gastar cuota y distingue tareas con las mismas fuentes', async t => {
+  const counts = [], f = await fixture(t, { ai: { enabled: true, generate: async (_s, _t, { questionCount }) => { counts.push(questionCount); return { id: 'count-' + questionCount, title: 'Clase', questions: [] }; } } });
+  const token = await f.player('Ana'), input = { background: true, sources: [{ text: 'La clase contiene hechos explicados para preparar el examen. '.repeat(10) }] };
+  for (const questionCount of [1, 7, 21, '20']) assert.equal((await f.call('/study', token, { ...input, questionCount })).status, 400);
+  const six = (await f.call('/study', token, { ...input, questionCount: 6 })).body;
+  const twenty = (await f.call('/study', token, { ...input, questionCount: 20 })).body;
+  assert.notEqual(six.id, twenty.id); assert.deepEqual(counts, [6, 20]);
+  assert.equal((await f.call('/study', token, { ...input, questionCount: 6 })).body.id, six.id);
+});
 test('el análisis de IA exige clave activada, material suficiente y respeta el límite global', async t => {
   const off = await fixture(t), p = await off.player('Ana'); assert.equal((await off.call('/study', p, { sources: [] })).status, 503);
   let calls = 0;

@@ -4,11 +4,12 @@ import { setTimeout as wait } from 'node:timers/promises';
 // share ONE retry, on the same model and key, within the same deadline.
 // The callback reserves a second quota slot before a second outbound call.
 export async function requestModel(transport, url, init, context, ServiceError) {
-  const deadline = Date.now() + 55000;
+  const extended = context.questionCount === 20 ? 60000 : context.questionCount === 12 ? 40000 : 27000;
+  const deadline = Date.now() + Math.max(55000, extended * 2 - 1000);
   for (let attempt = 0; attempt < 2; attempt++) {
     context.signal?.throwIfAborted();
     context.onProgress?.({ stage: 'generating', attempt: attempt + 1 });
-    const signal = AbortSignal.any([AbortSignal.timeout(Math.min(27000, Math.max(1, deadline - Date.now()))), ...(context.signal ? [context.signal] : [])]);
+    const signal = AbortSignal.any([AbortSignal.timeout(Math.min(extended, Math.max(1, deadline - Date.now()))), ...(context.signal ? [context.signal] : [])]);
     let response;
     try { response = await transport(url, { ...init, signal }); }
     catch (error) {

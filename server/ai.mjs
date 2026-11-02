@@ -4,7 +4,8 @@ import { requestModel } from './inference.mjs';
 import { createGroq } from './groq.mjs';
 import { withQuotaFallback } from './fallback.mjs';
 import { createCitationVerifier, CitationError, analysisSources } from './citations.mjs';
-import { teachingInstructions } from './teaching.mjs';
+import { studyInstructions } from './teaching.mjs';
+import { MAX_QUESTIONS, questionTarget, outputBudget } from '../web/core/question-count.js';
 
 const citation = {
   type: 'object', additionalProperties: false,
@@ -19,7 +20,7 @@ const schema = {
       type: 'object', additionalProperties: false,
       properties: { idea: { type: 'string' }, ...citation.properties }, required: ['idea', ...citation.required]
     } },
-    questions: { type: 'array', maxItems: 8, items: {
+    questions: { type: 'array', maxItems: MAX_QUESTIONS, items: {
       type: 'object', additionalProperties: false,
       properties: { prompt: { type: 'string' }, options: { type: 'array', items: { type: 'string' }, minItems: 3, maxItems: 3 }, answer: { type: 'integer', minimum: 0, maximum: 2 }, explanation: { type: 'string' }, skill: { type: 'string', enum: ['recall', 'understand', 'apply'] }, ...citation.properties },
       required: ['prompt', 'options', 'answer', 'explanation', 'skill', ...citation.required]
@@ -48,10 +49,11 @@ async function providerFailure(response) {
   if (response.status === 400) return new AIServiceError('OpenAI rechazó la configuración del análisis. Revisa el modelo y los parámetros del servidor.', 503, 'ai_configuration_error');
   return new AIServiceError('El proveedor de IA no está disponible en este momento. Inténtalo más tarde.', 502, 'ai_provider_unavailable');
 }
-export function validateAnalysis(result, sources) {
+export function validateAnalysis(result, sources, requestedCount) {
+  const target = questionTarget(requestedCount);
   if (!result || typeof result !== 'object' || Array.isArray(result)) throw new Error('La IA devolvió un análisis incompleto. Inténtalo de nuevo.');
   if (result.insufficient_material) throw new Error('El material no contiene suficientes ideas explicadas para crear una trivia. Agrega el contenido de la clase.');
-  if (typeof result.summary !== 'string' || !result.summary.trim() || !Array.isArray(result.key_points) || result.key_points.length < 2 || !Array.isArray(result.questions) || result.questions.length < 2 || result.questions.length > 8) throw new Error('La IA devolvió un análisis incompleto. Inténtalo de nuevo.');
+  if (typeof result.summary !== 'string' || !result.summary.trim() || !Array.isArray(result.key_points) || result.key_points.length < 2 || !Array.isArray(result.questions) || result.questions.length < 2 || result.questions.length > MAX_QUESTIONS) throw new Error('La IA devolvió un análisis incompleto. Inténtalo de nuevo.');
   const evidence = createCitationVerifier(sources);
   let omittedKeyPoints = 0, omittedQuestions = 0, citationFailure;
   function verified(item) { try { return evidence(item); } catch (error) { if (!(error instanceof CitationError)) throw error; citationFailure = error; return null; } }
@@ -69,7 +71,7 @@ export function validateAnalysis(result, sources) {
   if (questions.length < 2 || !keyPoints.length) throw citationFailure || new Error('El análisis no contiene suficientes preguntas respaldadas.');
   const distinct = [...new Map(questions.map(q => [compact(q.prompt).toLowerCase(), q])).values()];
   if (distinct.length < 2) throw new Error('La IA repitió las preguntas. Inténtalo con otro fragmento de tu clase.');
-  return { id: `ai-${randomUUID()}`, title: String(result.title || 'Mi clase').slice(0, 100), icon: '📚', category: 'Ideas clave · IA', summary: result.summary.trim(), keyPoints, questions: distinct, ...(omittedQuestions || omittedKeyPoints ? { quality: { omittedQuestions, omittedKeyPoints } } : {}) };
+  return { id: `ai-${randomUUID()}`, title: String(result.title || 'Mi clase').slice(0, 100), icon: '📚', category: 'Ideas clave · IA', summary: result.summary.trim(), keyPoints, requestedCount: target, questions: distinct.slice(0, target), ...(omittedQuestions || omittedKeyPoints ? { quality: { omittedQuestions, omittedKeyPoints } } : {}) };
 }
 
 export function createAI(options = {}) {
@@ -97,8 +99,8 @@ function createOpenAI({ key = process.env.WINY_AI_KEY, model = process.env.WINY_
       if (!key) throw new Error('La función de IA aún no está activada en el servidor.');
       const response = await requestModel(transport, 'https://api.openai.com/v1/responses', {
         method: 'POST', headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ model, store: false, max_output_tokens: 4096, reasoning: { effort: 'low' },
-          instructions: teachingInstructions,
+        body: JSON.stringify({ model, store: false, max_output_tokens: outputBudget(context.questionCount), reasoning: { effort: 'low' },
+          instructions: studyInstructions(context.questionCount),
           input: JSON.stringify({ topic, sources: analysisSources(sources) }),
           text: { format: { type: 'json_schema', name: 'winy_study', strict: true, schema } }
         })
@@ -110,7 +112,7 @@ function createOpenAI({ key = process.env.WINY_AI_KEY, model = process.env.WINY_
       const output = (data.output || []).flatMap(x => x.content || []).filter(x => x.type === 'output_text').map(x => x.text).join('');
       let result;
       try { result = JSON.parse(output); } catch { throw new Error('La IA no devolvió un análisis válido.'); }
-      return validateAnalysis(result, sources);
+      return validateAnalysis(result, sources, context.questionCount);
     }
   };
 }

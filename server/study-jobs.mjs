@@ -4,9 +4,9 @@ export function createStudyJobs({ generate, save, reserve, clock = Date.now }) {
   const jobs = new Map();
   const view = job => ({ id: job.id, status: job.status, stage: job.stage, attempt: job.attempt, elapsed: Math.max(0, clock() - job.created), ...(job.provider ? { provider: job.provider, fallback: job.fallback } : {}), ...(job.game ? { game: job.game } : {}), ...(job.error ? { error: job.error, code: job.code } : {}) });
   const clean = () => { for (const [id, job] of jobs) if (job.finished && clock() - job.finished > 600000) jobs.delete(id); };
-  function start(owner, sources, topic) {
+  function start(owner, sources, topic, questionCount) {
     clean();
-    const digest = createHash('sha256').update(JSON.stringify({ sources, topic })).digest('hex');
+    const digest = createHash('sha256').update(JSON.stringify({ sources, topic, questionCount })).digest('hex');
     const same = [...jobs.values()].find(j => j.owner === owner && j.digest === digest && ['running', 'completed'].includes(j.status));
     if (same) return view(same);
     if ([...jobs.values()].some(j => j.owner === owner && j.status === 'running')) { const error = new Error('Ya tienes un repaso preparándose. Termínalo o cancélalo antes de crear otro.'); error.status = 409; throw error; }
@@ -14,10 +14,10 @@ export function createStudyJobs({ generate, save, reserve, clock = Date.now }) {
     reserve(owner);
     const job = { id: randomUUID(), owner, digest, status: 'running', stage: 'generating', attempt: 1, created: clock(), controller: new AbortController() };
     jobs.set(job.id, job);
-    const deadline = setTimeout(() => job.controller.abort(new Error('ai_timeout')), 60000);
+    const deadline = setTimeout(() => job.controller.abort(new Error('ai_timeout')), questionCount === 20 ? 120000 : questionCount === 12 ? 90000 : 60000);
     job.done = (async () => {
       try {
-        const game = await generate(sources, topic, { signal: job.controller.signal, beforeRetry: () => reserve(owner), onProgress: progress => { job.stage = progress.stage; job.attempt = progress.attempt || job.attempt; if (progress.provider) job.provider = progress.provider; if (progress.fallback || progress.stage === 'fallback') job.fallback = true; } });
+        const game = await generate(sources, topic, { questionCount, signal: job.controller.signal, beforeRetry: () => reserve(owner), onProgress: progress => { job.stage = progress.stage; job.attempt = progress.attempt || job.attempt; if (progress.provider) job.provider = progress.provider; if (progress.fallback || progress.stage === 'fallback') job.fallback = true; } });
         job.controller.signal.throwIfAborted();
         save(owner, game); job.game = game; job.status = 'completed'; job.stage = 'completed';
       } catch (error) {

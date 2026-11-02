@@ -29,6 +29,7 @@
 .confidence input,.explain-rubric input{width:20px;height:20px;flex:0 0 20px;margin:1px 0 0;accent-color:#496b4f}
 .learning-skill{color:#48633d;margin-top:15px}.timer-phase{text-align:center;font-weight:800;margin-bottom:20px}
 .modal-body:has(#focus-goal) .timer-circle{width:210px;height:210px;margin:25px auto}.modal-body:has(#focus-goal) #timer-time{font-size:48px}.modal-body:has(#focus-goal) .notice{margin:22px 0}
+.room-title{text-align:center;font-size:24px;margin-bottom:12px;overflow-wrap:anywhere}.room-players{margin-top:22px}.feedback blockquote{border-left:3px solid #93ab6f;padding:12px;margin:16px 0 0;font-size:14px;line-height:1.6;overflow-wrap:anywhere}.feedback cite{display:block;font-size:12px;font-style:normal;margin-top:8px;color:#546848}
 .timer-demo{margin-top:20px}.timer-demo summary{cursor:pointer;font-size:14px}.timer-demo .pill{margin:14px 0}.goal-check{padding:18px 0;margin-bottom:20px;border-bottom:1px solid var(--line)}.goal-check h3{font-size:21px;margin-bottom:12px}
 .pomodoro-bar{position:fixed;z-index:5;bottom:calc(99px + env(safe-area-inset-bottom));left:50%;transform:translateX(-50%);width:min(552px,calc(100% - 32px));display:flex;gap:10px;align-items:center;justify-content:space-between;min-height:48px;padding:12px 16px;border:1px solid #cad9b8;border-radius:18px;background:#edf4df;box-shadow:0 4px 16px #324b3020;font-size:13px}
 .pomodoro-bar strong{font-variant-numeric:tabular-nums;font-size:20px}.pomodoro-bar small{font-size:11px}.app:has(.pomodoro-bar) .page{padding-bottom:215px}

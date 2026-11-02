@@ -1,8 +1,8 @@
 # Winy 🌱
 
-**[Descargar APK de prueba 0.6.0](https://github.com/melendezzz26/winy/raw/refs/heads/winy-apk-prueba/winy-debug.apk)** · [Activar cuentas con Supabase](docs/cuentas.md) · [Activar Groq como respaldo](docs/groq.md) · [Configurar Gemini para pruebas](docs/gemini.md) · [Auditoría de aprendizaje 15–16 años](docs/auditoria-aprendizaje.md) · [Auditoría funcional](docs/auditoria.md) · [Configurar servidor](docs/ia-y-salas.md)
+**[Descargar APK de prueba 0.7.0](https://github.com/melendezzz26/winy/raw/refs/heads/winy-apk-prueba/winy-debug.apk)** · [Exámenes entre compañeros](docs/examenes-compartidos.md) · [Activar cuentas con Supabase](docs/cuentas.md) · [Activar Groq como respaldo](docs/groq.md) · [Configurar Gemini para pruebas](docs/gemini.md) · [Auditoría de aprendizaje 15–16 años](docs/auditoria-aprendizaje.md) · [Auditoría funcional](docs/auditoria.md) · [Configurar servidor](docs/ia-y-salas.md)
 
-Este APK incluye Pomodoro con metas y descansos, explicación con palabras propias, repaso de errores y dudas, tutorial que se puede omitir, trivia y tarjetas, mapa geográfico, seis misiones con pasaporte y pañuelos que siguen el cuerpo de cada mascota. Se conecta a `https://winy.onrender.com`. Para usar la IA configura su clave en Render; no se incluyen claves en el APK. Las salas necesitan que el servidor esté activo.
+Este APK permite preparar hasta 20 preguntas y compartir un repaso de examen en una sala para dos teléfonos. Incluye Pomodoro con metas y descansos, explicación con palabras propias, repaso de errores y dudas, tutorial que se puede omitir, trivia y tarjetas, mapa geográfico, seis misiones con pasaporte y pañuelos que siguen el cuerpo de cada mascota. Se conecta a `https://winy.onrender.com`. Para usar la IA configura su clave en Render; no se incluyen claves en el APK. Las salas necesitan que el servidor esté activo.
 
 Aplicación web móvil de hábitos y aprendizaje, creada a partir de las capturas del prototipo **Winy · Tu pequeña gran aventura**. Incluye cuatro compañeros peruanos, cinco secciones y progreso local o vinculado a una cuenta. Las cuatro mascotas usan los PNG originales de `mascotas.zip`, con su transparencia y sin modificar los archivos. El logotipo SVG sigue siendo provisional.
 
@@ -47,7 +47,9 @@ En **Estudiar → Crear juego con mis archivos**, revisa primero el texto leído
 - Word `.docx` y PowerPoint `.pptx`, hasta 80 diapositivas (fflate y extracción del XML).
 - TXT, Markdown y texto pegado.
 
-El modo local crea preguntas para completar una palabra y conserva la frase original como evidencia. El modo IA selecciona ideas clave, genera un resumen y crea trivia. El modelo elige pasajes numerados y Winy recupera literalmente las citas del texto original. Se conservan las preguntas verificadas y se avisa si se descartaron partes sin respaldo. La compatibilidad con respuestas antiguas admite diferencias de formato sin inventar citas. Este segundo modo requiere activar la API en el servidor. No se incluye OCR: los escaneos, PDF con contraseña, `.doc` y `.ppt` no se procesan. Se guardan hasta 10 juegos en el dispositivo, con sus ejercicios, citas y agenda de repaso. La lectura rápida usa hasta 24.000 caracteres en extractos distribuidos y avisa si omite contenido; el modo completo admite hasta 80.000 caracteres. La preparación con IA muestra avances, se puede cancelar y conserva el archivo extraído al reintentar. Cada juego creado permite practicar los cuatro modos sin nuevas llamadas a la IA.
+El modo local crea preguntas para completar una palabra y conserva la frase original como evidencia. El modo IA selecciona ideas clave, genera un resumen y crea trivia. El modelo elige pasajes numerados y Winy recupera literalmente las citas del texto original. Se conservan las preguntas verificadas y se avisa si se descartaron partes sin respaldo. La compatibilidad con respuestas antiguas admite diferencias de formato sin inventar citas. Este segundo modo requiere activar la API en el servidor. No se incluye OCR: los escaneos, PDF con contraseña, `.doc` y `.ppt` no se procesan. Puedes elegir 6, 12 o 20 preguntas según la cantidad de material; si salen menos se indica la cantidad real. Se guardan hasta 10 juegos en el dispositivo, con sus ejercicios, citas y agenda de repaso. La lectura rápida usa hasta 24.000 caracteres en extractos distribuidos y avisa si omite contenido; el modo completo admite hasta 80.000 caracteres. La preparación con IA muestra avances, se puede cancelar y conserva el archivo extraído al reintentar. Cada juego creado permite practicar los cuatro modos sin nuevas llamadas a la IA.
+
+Cada usuario puede crear una sala con uno de sus repasos y compartir el código con un compañero. Las salas aceptan trivia y completar palabras; en exámenes, ambos confirman que revisaron la explicación antes de continuar. Al terminar pueden guardar las preguntas y sus errores sin volver a generar contenido. Consulta [cómo estudiar un examen juntos](docs/examenes-compartidos.md).
 
 Consulta [cómo configurar la API, el modelo y las salas](docs/ia-y-salas.md). Se puede elegir **OpenAI (`gpt-5.4-mini`)** o **Gemini (`gemini-3.8-flash`)**. Para pruebas con cuota gratuita de Google sigue [la guía de Gemini](docs/gemini.md). También se puede usar [Groq con `openai/gpt-oss-20b` como respaldo automático](docs/groq.md) cuando Gemini informa falta de cuota. Cada proveedor mantiene sus propios límites; el cupo global de Winy se aplica a ambos.
 
@@ -58,7 +60,7 @@ npm run check
 npm test
 ```
 
-Las pruebas de estado y estudio verifican recompensas, compras, restauración, creación de ejercicios y límites de archivos.
+Las 67 pruebas de lógica y servidor incluyen cantidad de preguntas, salas de examen con avance coordinado y resultados personales. Las pruebas de estado y estudio verifican recompensas, compras, restauración, creación de ejercicios y límites de archivos.
 
 Con el servidor iniciado y Chromium instalado:
 

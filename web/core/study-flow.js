@@ -7,7 +7,7 @@ const esc = value => String(value ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;
 const FORMATS = { trivia: 'Trivia', cards: 'Tarjetas de memoria', mixed: 'Repaso mixto', explain: 'Explicación con mis palabras' };
 export function createStudyFlow({ open, dialog, getService, refresh, onGame }) {
   let cached = null, values = null, prepared = null, work = null;
-  function snapshot(form) { return { topic: form.topic.value, notes: form.notes.value, mode: form.mode.value, format: form.format.value, scope: form.scope.value }; }
+  function snapshot(form) { return { topic: form.topic.value, notes: form.notes.value, mode: form.mode.value, format: form.format.value, scope: form.scope.value, questionCount: Number(form.questionCount.value) }; }
   function stash() { const form = dialog.querySelector('#notes-form'); if (form) { values = snapshot(form); const files = [...form.querySelector('#files').files]; if (files.length && (!cached || cached.files.length !== files.length || files.some((f, i) => cached.files[i] !== f))) { cached = { files, sources: null }; prepared = null; } } }
   function cancel() { stash(); work?.abort(); }
   function show() {
@@ -21,12 +21,13 @@ export function createStudyFlow({ open, dialog, getService, refresh, onGame }) {
       <label for="notes">O pega un fragmento de tus apuntes</label><textarea id="notes" name="notes" rows="4" maxlength="80000" placeholder="Pega varios párrafos de tu clase…"></textarea>
       <label for="review-format">Elige tu juego</label><select id="review-format" name="format"><option value="trivia">Trivia · elige una respuesta</option><option value="cards">Tarjetas · recuerda y da la vuelta</option><option value="mixed">Mixto · combina trivia y tarjetas</option><option value="explain">Con mis palabras · explica y compara</option></select>
       <p class="small muted">En todos los modos podrás repasar tus errores y volver a practicar más adelante.</p>
+      <label for="question-count">¿Cuántas preguntas quieres preparar?</label><select id="question-count" name="questionCount"><option value="6">6 · repaso breve</option><option value="12" selected>12 · repaso de mi clase</option><option value="20">20 · preparar mi examen</option></select><p class="small muted">Si el material no alcanza, se prepararán menos. Puedes usarlas para estudiar o jugar con un compañero.</p>
       <label for="study-scope">Cuánto quieres analizar</label><select id="study-scope" name="scope"><option value="fast">Lectura rápida · hasta 24.000 caracteres</option><option value="full">Documento completo · hasta 80.000 caracteres</option></select>
       <div id="source-preview"></div><p id="study-progress" class="study-progress" role="status" aria-live="polite"></p><p class="form-error" id="notes-error" role="alert"></p>
       <button type="submit" class="primary">Ver mi repaso</button><button type="button" class="secondary full" data-action="cancel-study" hidden>Cancelar preparación</button></form>
       <p class="notice">El modo IA envía el texto al servicio de Winy y a <span id="ai-provider-name">${esc(providerDisclosure(service))}</span>. Cada cita se comprueba contra los extractos. La lectura rápida distribuye extractos por el documento; puede omitir contenido. Groq analiza hasta 10.000 caracteres en extractos si el material es mayor. La opción sin conexión crea ejercicios locales. Hasta 40 páginas por PDF y 80 diapositivas por PPTX; no incluye OCR.</p>`, 'notes');
     const form = dialog.querySelector('#notes-form');
-    if (values) for (const key of ['topic', 'notes', 'mode', 'format', 'scope']) form.elements[key].value = values[key];
+    if (values) for (const key of ['topic', 'notes', 'mode', 'format', 'scope', 'questionCount']) form.elements[key].value = values[key];
     if (cached) form.querySelector('#cached-files').textContent = 'Archivo preparado: ' + cached.files.map(f => f.name).join(', ');
     if (prepared) preview(form, prepared.material);
     refresh();
@@ -40,7 +41,7 @@ export function createStudyFlow({ open, dialog, getService, refresh, onGame }) {
   }
   function preview(form, material) {
     const mode = form.format.value;
-    form.querySelector('#source-preview').innerHTML = `<section class="source-preview"><span class="tag">Tu archivo está leído</span><h3>${FORMATS[mode]}</h3><p>${mode === 'explain' ? 'Escribe tu explicación sin mirar. Luego compárala con la respuesta y los apuntes; tú valoras qué falta.' : mode === 'cards' ? 'Piensa tu respuesta, descubre la explicación y marca qué recordaste.' : mode === 'mixed' ? 'Alterna preguntas con tarjetas para recordar sin mirar las alternativas.' : 'Responde preguntas, recibe una explicación y vuelve a practicar tus errores.'}</p><p class="small">${material.selected.toLocaleString('es-PE')} de ${material.total.toLocaleString('es-PE')} caracteres${material.sampled ? ' · extractos distribuidos' : ' · texto completo leído'}</p><details><summary>Ver el texto detectado</summary><blockquote>${esc(material.sources[0]?.text.slice(0, 750))}<cite>${esc(material.sources[0]?.name)}</cite></blockquote></details><p class="small muted">Se crearán hasta 6 preguntas con IA, o hasta 8 ejercicios locales según el material. Podrás ver el juego antes de empezar.</p></section>`;
+    form.querySelector('#source-preview').innerHTML = `<section class="source-preview"><span class="tag">Tu archivo está leído</span><h3>${FORMATS[mode]}</h3><p>${mode === 'explain' ? 'Escribe tu explicación sin mirar. Luego compárala con la respuesta y los apuntes; tú valoras qué falta.' : mode === 'cards' ? 'Piensa tu respuesta, descubre la explicación y marca qué recordaste.' : mode === 'mixed' ? 'Alterna preguntas con tarjetas para recordar sin mirar las alternativas.' : 'Responde preguntas, recibe una explicación y vuelve a practicar tus errores.'}</p><p class="small">${material.selected.toLocaleString('es-PE')} de ${material.total.toLocaleString('es-PE')} caracteres${material.sampled ? ' · extractos distribuidos' : ' · texto completo leído'}</p><details><summary>Ver el texto detectado</summary><blockquote>${esc(material.sources[0]?.text.slice(0, 750))}<cite>${esc(material.sources[0]?.name)}</cite></blockquote></details><p class="small muted">Se prepararán hasta ${Number(form.questionCount.value)} preguntas según el material. Podrás ver el juego antes de empezar.</p></section>`;
     form.querySelector('button[type=submit]').textContent = 'Preparar mi ' + FORMATS[mode].toLowerCase();
     form.querySelector('.source-preview').scrollIntoView({ block: 'nearest', behavior: 'smooth' });
   }
@@ -65,10 +66,10 @@ export function createStudyFlow({ open, dialog, getService, refresh, onGame }) {
         prepared = { fingerprint, material }; preview(form, material); stage = 'Texto listo. Revisa la vista previa y prepara tu juego'; update(); return;
       }
       stage = values.mode === 'ai' ? 'La IA está seleccionando ideas y preparando tu repaso…' : 'Preparando ejercicios sin conexión…'; update();
-      let game = values.mode === 'ai' ? await analyze(material.sources, values.topic, currentName() || 'Explorador', { signal: controller.signal, onProgress: job => { stage = job.fallback || job.stage === 'fallback' ? `Preparando tu repaso con ${providerLabel(job.provider)} como respaldo…` : job.stage === 'retrying' ? 'El proveedor está ocupado. Reintentando una vez…' : job.stage === 'validating' ? 'Comprobando preguntas y citas…' : job.attempt > 1 ? 'Preparando el repaso · segundo intento…' : 'Seleccionando ideas y creando el repaso…'; update(); } }) : makeStudyGame(material.sources, values.topic);
+      let game = values.mode === 'ai' ? await analyze(material.sources, values.topic, currentName() || 'Explorador', { questionCount: values.questionCount, signal: controller.signal, onProgress: job => { stage = job.fallback || job.stage === 'fallback' ? `Preparando tu repaso con ${providerLabel(job.provider)} como respaldo…` : job.stage === 'retrying' ? 'El proveedor está ocupado. Reintentando una vez…' : job.stage === 'validating' ? 'Comprobando preguntas y citas…' : job.attempt > 1 ? 'Preparando el repaso · segundo intento…' : 'Seleccionando ideas y creando el repaso…'; update(); } }) : makeStudyGame(material.sources, values.topic, values.questionCount);
       controller.signal.throwIfAborted();
       if (!form.isConnected) return;
-      game = { ...game, playMode: values.format, coverage: { selected: material.selected, total: material.total, sampled: material.sampled } };
+      game = { ...game, playMode: values.format, requestedCount: values.questionCount, coverage: { selected: material.selected, total: material.total, sampled: material.sampled } };
       cached = null; prepared = null; values = null; onGame(game);
     } catch (error) {
       if (form.isConnected) { form.querySelector('#notes-error').textContent = controller.signal.aborted ? 'Preparación cancelada. El archivo sigue listo para continuar.' : error.message; form.querySelector('#study-progress').textContent = ''; }

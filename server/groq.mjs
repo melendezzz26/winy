@@ -1,5 +1,6 @@
 import { requestModel } from './inference.mjs';
-import { teachingInstructions } from './teaching.mjs';
+import { studyInstructions } from './teaching.mjs';
+import { outputBudget } from '../web/core/question-count.js';
 import { groqMaterial } from './materials.mjs';
 import { analysisSources } from './citations.mjs';
 
@@ -10,8 +11,8 @@ export function createGroq({ key, model, transport, schema, validateAnalysis, Se
       const material = groqMaterial(sources);
       const response = await requestModel(transport, 'https://api.groq.com/openai/v1/chat/completions', {
         method: 'POST', headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ model, max_completion_tokens: 3072, ...(model.startsWith('openai/gpt-oss-') ? { reasoning_effort: 'low' } : {}),
-          messages: [{ role: 'system', content: teachingInstructions }, { role: 'user', content: JSON.stringify({ topic, sources: analysisSources(material.sources) }) }],
+        body: JSON.stringify({ model, max_completion_tokens: outputBudget(context.questionCount), ...(model.startsWith('openai/gpt-oss-') ? { reasoning_effort: 'low' } : {}),
+          messages: [{ role: 'system', content: studyInstructions(context.questionCount) }, { role: 'user', content: JSON.stringify({ topic, sources: analysisSources(material.sources) }) }],
           response_format: { type: 'json_schema', json_schema: { name: 'winy_study', strict: true, schema } }
         })
       }, context, ServiceError);
@@ -31,7 +32,7 @@ export function createGroq({ key, model, transport, schema, validateAnalysis, Se
       const data = await response.json(), choice = data.choices?.[0];
       if (!choice || choice.finish_reason !== 'stop') throw new ServiceError('Groq no completó el análisis. Prueba un fragmento más pequeño.', 502, 'ai_incomplete');
       let result; try { result = JSON.parse(choice.message?.content); } catch { throw new ServiceError('Groq no devolvió un repaso válido. Tus apuntes siguen preparados.', 502, 'ai_invalid_output'); }
-      try { return { ...validateAnalysis(result, material.sources), provider: 'groq', model, providerCoverage: material.coverage }; } catch (error) { throw new ServiceError(error.message, 422, 'ai_invalid_output'); }
+      try { return { ...validateAnalysis(result, material.sources, context.questionCount), provider: 'groq', model, providerCoverage: material.coverage }; } catch (error) { throw new ServiceError(error.message, 422, 'ai_invalid_output'); }
     }
   };
 }

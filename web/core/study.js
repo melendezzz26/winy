@@ -1,8 +1,10 @@
+import { questionTarget } from './question-count.js';
 export const MAX_FILES = 5;
 export const MAX_BYTES = 8 * 1024 * 1024;
 export function normalize(text) { return text.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9ñ\s]/g, ' ').replace(/\s+/g, ' ').trim(); }
 const STOP = new Set('para como esta este estas estos entre sobre porque cuando donde desde hasta tiene tienen puede pueden una unas unos del las los que con por sus son ser más muy pero también'.split(' '));
-export function makeStudyGame(sources, topic = '') {
+export function makeStudyGame(sources, topic = '', requestedCount) {
+  const count = questionTarget(requestedCount);
   const candidates = [];
   for (const source of sources) {
     const cleaned = source.text.replace(/\r/g, '').replace(/\s+/g, ' ').trim();
@@ -21,10 +23,10 @@ export function makeStudyGame(sources, topic = '') {
   }
   const unique = [...new Map(candidates.map(q => [normalize(q.evidence), q])).values()].sort((a, b) => b.rank - a.rank);
   if (unique.length < 2) throw new Error('Necesitamos al menos dos frases explicativas completas. Pega varios párrafos de tu clase; no basta con el título.');
-  const questions = unique.slice(0, 8).map(({ rank, ...q }) => q);
+  const questions = unique.slice(0, count).map(({ rank, ...q }) => q);
   let hash = 0;
   for (const c of questions.map(q => q.evidence).join('')) hash = ((hash << 5) - hash + c.charCodeAt(0)) | 0;
-  return { id: `notes-${(hash >>> 0).toString(36)}`, title: topic.trim().slice(0, 100) || 'Mi aventura de estudio', icon: '📚', category: 'Tus apuntes · Completar palabras', questions };
+  return { id: `notes-${(hash >>> 0).toString(36)}`, title: topic.trim().slice(0, 100) || 'Mi aventura de estudio', icon: '📚', category: 'Tus apuntes · Completar palabras', requestedCount: count, questions };
 }
 export function checkStudyAnswer(answer, expected) { return normalize(answer) === normalize(expected); }
 export async function readSources(files, { signal, onProgress } = {}) {

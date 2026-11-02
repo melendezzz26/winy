@@ -3,10 +3,11 @@ import { createHash, randomBytes, randomUUID } from 'node:crypto';
 import { mkdirSync } from 'node:fs';
 import path from 'node:path';
 import { createAI } from './ai.mjs';
-import { newRoom, advance, publicRoom, reveal, ROUND_MS } from './rooms.mjs';
+import { newRoom, advance, publicRoom, reveal, ROUND_MS, validAnswer, nextRound } from './rooms.mjs';
 import { createStudyJobs } from './study-jobs.mjs';
 import { createAccounts } from './accounts.mjs';
 import { restoreState } from '../web/core/state.js';
+import { questionTarget } from '../web/core/question-count.js';
 
 class ApiError extends Error { constructor(status, message, code) { super(message); this.status = status; this.code = code; } }
 const fail = (status, text, code) => { throw new ApiError(status, text, code); };
@@ -106,7 +107,7 @@ export function createApi({ dbPath = process.env.WINY_DB || path.resolve('.local
         if (req.method === 'GET') return reply(200, { progress: await accounts.load(player.account.user_id, token) });
         if (req.method !== 'POST') fail(405, 'Método no permitido.');
         const input = await body(req);
-        if (!input.progress || typeof input.progress !== 'object' || Array.isArray(input.progress) || JSON.stringify(input.progress).length > 180000) fail(400, 'El progreso no es válido o es demasiado grande.');
+        if (!input.progress || typeof input.progress !== 'object' || Array.isArray(input.progress) || Buffer.byteLength(JSON.stringify(input.progress), 'utf8') > 450000) fail(400, 'El progreso no es válido o es demasiado grande.');
         await accounts.save(player.account.user_id, token, restoreState(input.progress)); return reply(200, { saved: true });
       }
       const studyJob = /^\/api\/study\/jobs\/([a-f0-9-]{36})(\/cancel)?$/.exec(pathname);
@@ -130,21 +131,22 @@ export function createApi({ dbPath = process.env.WINY_DB || path.resolve('.local
         if (length < 200) fail(400, 'Agrega varios párrafos explicativos. El título solo no es suficiente.');
         if (length > 80000) fail(413, 'Analiza un fragmento de hasta 80.000 caracteres cada vez.');
         const topic = typeof input.topic === 'string' ? input.topic.slice(0, 100) : '';
-        if (input.background === true) return reply(202, jobs.start(player.id, sources, topic));
+        let questionCount; try { questionCount = questionTarget(input.questionCount); } catch (error) { fail(400, error.message); }
+        if (input.background === true) return reply(202, jobs.start(player.id, sources, topic, questionCount));
         reserveAnalysis(player.id);
-        const game = await ai.generate(sources, topic, { beforeRetry: () => reserveAnalysis(player.id) });
+        const game = await ai.generate(sources, topic, { questionCount, beforeRetry: () => reserveAnalysis(player.id) });
         saveGame(player.id, game);
         return reply(201, game);
       }
       if (req.method === 'POST' && pathname === '/api/rooms') {
         rate(`rooms:${player.id}`, 10, 3600000);
         const input = await body(req); let room;
-        try { room = newRoom(player, input.topic || 'peru', now); } catch { fail(400, 'Tema no disponible.'); }
-        while (db.prepare('SELECT code FROM rooms WHERE code=?').get(room.code)) room = newRoom(player, input.topic || 'peru', now);
+        try { room = newRoom(player, input.topic || 'peru', now, input); } catch (error) { fail(400, error.message); }
+        while (db.prepare('SELECT code FROM rooms WHERE code=?').get(room.code)) room = newRoom(player, input.topic || 'peru', now, input);
         saveRoom(room); return reply(201, publicRoom(room, player.id, now));
       }
       const roomInput = req.method === 'POST' ? await body(req) : {};
-      const match = /^\/api\/rooms\/([A-Z0-9]{6})(?:\/(join|start|answer))?$/.exec(pathname);
+      const match = /^\/api\/rooms\/([A-Z0-9]{6})(?:\/(join|start|answer|next))?$/.exec(pathname);
       if (!match) fail(404, 'Recurso no encontrado.');
       const row = db.prepare('SELECT state FROM rooms WHERE code=?').get(match[1]);
       if (!row) fail(404, 'No encontramos esa sala. Revisa el código.');
@@ -162,13 +164,17 @@ export function createApi({ dbPath = process.env.WINY_DB || path.resolve('.local
         if (match[2] === 'start' && req.method === 'POST') {
           if (room.host !== player.id) fail(403, 'La persona que creó la sala debe iniciar la partida.');
           if (room.players.length !== 2) fail(409, 'Espera a que tu amigo entre con el código.');
-          if (room.phase === 'waiting') { room.phase = 'asking'; room.deadline = now + ROUND_MS; }
+          if (room.phase === 'waiting') { room.phase = 'asking'; room.deadline = now + (room.roundMs || ROUND_MS); }
+        } else if (match[2] === 'next' && req.method === 'POST') {
+          if (!room.custom || room.phase !== 'reveal' || roomInput.round !== room.round) fail(409, 'Esta ronda ya cambió. Actualiza la sala.');
+          if (!room.ready.includes(player.id)) room.ready.push(player.id);
+          if (room.players.every(p => room.ready.includes(p.id))) nextRound(room, now);
         } else if (match[2] === 'answer' && req.method === 'POST') {
           const input = roomInput;
           if (input.round !== room.round) fail(409, 'La partida avanzó. Ya estamos en la siguiente pregunta.');
           if (!Object.hasOwn(room.answers, player.id)) {
             if (room.phase !== 'asking') fail(409, 'Esta pregunta ya terminó.');
-            if (!Number.isInteger(input.answer) || input.answer < 0 || input.answer >= room.questions[room.round].options.length) fail(400, 'Respuesta no válida.');
+            if (!validAnswer(room.questions[room.round], input.answer)) fail(400, 'Respuesta no válida.');
             room.answers[player.id] = input.answer;
             if (room.players.every(p => Object.hasOwn(room.answers, p.id))) reveal(room, now);
           }
