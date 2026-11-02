@@ -88,9 +88,47 @@ test('Gemini reintenta un 503 una sola vez, reserva cuota y reduce la generació
   const ai = createAI({ provider: 'gemini', model: 'gemini-3.8-flash', key: 'test-only-key', transport: async (_url, options) => { calls++; body = JSON.parse(options.body); return calls === 1 ? { ok: false, status: 503, json: async () => ({}) } : { ok: true, json: async () => ({ candidates: [{ finishReason: 'STOP', content: { parts: [{ text: JSON.stringify(example()) }] } }] }) }; } });
   const result = await ai.generate(sources, '', { retryDelayMs: 0, beforeRetry: () => { reserved++; }, onProgress: p => stages.push(p.stage) });
   assert.equal(result.questions.length, 2); assert.equal(calls, 2); assert.equal(reserved, 1); assert.ok(stages.includes('retrying')); assert.ok(stages.includes('validating'));
-  assert.equal(body.generationConfig.maxOutputTokens, 4096); assert.equal(body.generationConfig.thinkingConfig.thinkingLevel, 'minimal');
+  assert.equal(body.generationConfig.maxOutputTokens, 4096); assert.equal(body.generationConfig.thinkingConfig.thinkingLevel, 'MINIMAL');
   calls = 0;
   const down = createAI({ provider: 'gemini', key: 'test-only-key', transport: async () => { calls++; return { ok: false, status: 503, json: async () => ({ error: { message: 'private-message' } }) }; } });
   await assert.rejects(down.generate(sources, '', { retryDelayMs: 0 }), e => e.status === 503 && e.code === 'ai_provider_unavailable' && !e.message.includes('private-message'));
   assert.equal(calls, 2);
+});
+test('el cuerpo REST de Gemini usa el enum canónico y no provoca el rechazo por minúsculas', async () => {
+  let calls = 0;
+  const ai = createAI({ provider: 'gemini', key: 'test-only-key', reportDiagnostic: () => {}, transport: async (_url, init) => {
+    calls++; const config = JSON.parse(init.body).generationConfig;
+    if (config.thinkingConfig?.thinkingLevel !== 'MINIMAL') return { status: 400, ok: false, json: async () => ({ error: { status: 'INVALID_ARGUMENT', message: 'Invalid value at generation_config.thinking_config.thinking_level' } }) };
+    return { ok: true, json: async () => ({ candidates: [{ finishReason: 'STOP', content: { parts: [{ text: JSON.stringify(example()) }] } }] }) };
+  } });
+  const result = await ai.generate(sources, '', { retryDelayMs: 0 }); assert.equal(result.questions.length, 2); assert.equal(calls, 1);
+});
+test('un ajuste de razonamiento no admitido tiene un solo reintento sin perder esquema, modelo ni citas', async () => {
+  const bodies = [], reports = [], stages = []; let reserved = 0;
+  const ai = createAI({ provider: 'gemini', key: 'test-only-sensitive-key', reportDiagnostic: event => reports.push(event), transport: async (url, init) => {
+    const body = JSON.parse(init.body); bodies.push(body); assert.ok(url.includes('gemini-3.8-flash'));
+    if (bodies.length === 1) return { status: 400, ok: false, json: async () => ({ error: { status: 'INVALID_ARGUMENT', message: 'thinking_config.thinking_level not supported; private-note test-only-sensitive-key' } }) };
+    return { ok: true, json: async () => ({ candidates: [{ finishReason: 'STOP', content: { parts: [{ text: JSON.stringify(example()) }] } }] }) };
+  } });
+  const result = await ai.generate(sources, '', { retryDelayMs: 0, beforeRetry: () => { reserved++; }, onProgress: p => stages.push(p) });
+  assert.equal(bodies.length, 2); assert.equal(reserved, 1); assert.equal(result.questions.length, 2);
+  assert.equal(bodies[1].generationConfig.thinkingConfig, undefined); assert.equal(bodies[1].generationConfig.maxOutputTokens, 8192);
+  assert.deepEqual(bodies[1].generationConfig.responseJsonSchema, bodies[0].generationConfig.responseJsonSchema); assert.deepEqual(bodies[1].contents, bodies[0].contents);
+  assert.ok(stages.some(p => p.reason === 'compatibility')); assert.deepEqual(reports[0].fields, ['thinkingConfig']);
+  assert.ok(!JSON.stringify(reports).includes('private-note')); assert.ok(!JSON.stringify(reports).includes('test-only-sensitive-key'));
+  let attempts = 0;
+  const stillRejected = createAI({ provider: 'gemini', key: 'test-only-key', reportDiagnostic: () => {}, transport: async () => { attempts++; return attempts === 1 ? { ok: false, status: 503 } : { ok: false, status: 400, json: async () => ({ error: { message: 'thinkingConfig.thinkingLevel not supported' } }) }; } });
+  await assert.rejects(stillRejected.generate(sources, '', { retryDelayMs: 0 }), error => error.code === 'ai_configuration_error');
+  assert.equal(attempts, 2, 'La recuperación temporal y la de compatibilidad comparten un único reintento');
+  attempts = 0;
+  const noQuota = createAI({ provider: 'gemini', key: 'test-only-key', reportDiagnostic: () => {}, transport: async () => { attempts++; return { ok: false, status: 400, json: async () => ({ error: { message: 'thinkingConfig.thinkingLevel not supported' } }) }; } });
+  await assert.rejects(noQuota.generate(sources, '', { retryDelayMs: 0, beforeRetry: () => { throw Object.assign(new Error('Cupo global agotado'), { code: 'winy_daily_requests_limit' }); } }), error => error.code === 'winy_daily_requests_limit');
+  assert.equal(attempts, 1, 'La compatibilidad no debe saltarse la reserva de cuota');
+});
+test('los rechazos de esquema tienen referencia segura y no generan reintentos de configuración a ciegas', async () => {
+  const reports = []; let calls = 0;
+  const ai = createAI({ provider: 'gemini', key: 'test-only-key', reportDiagnostic: report => reports.push(report), transport: async () => { calls++; return { status: 400, ok: false, json: async () => ({ error: { status: 'INVALID_ARGUMENT', message: 'response_json_schema rejected: private-document', details: [{ fieldViolations: [{ field: 'generation_config.response_json_schema', description: 'private-diagnostic' }] }] } }) }; } });
+  await assert.rejects(ai.generate(sources, '', { retryDelayMs: 0 }), error => error.code === 'ai_configuration_error' && error.message.includes(reports[0].reference) && !error.message.includes('private-'));
+  assert.equal(calls, 1); assert.equal(reports[0].httpStatus, 400); assert.deepEqual(reports[0].fields, ['responseJsonSchema']);
+  assert.ok(!JSON.stringify(reports).includes('private-'));
 });

@@ -4,7 +4,7 @@ import http from 'node:http';
 import { once } from 'node:events';
 import { createApi } from '../server/api.mjs';
 import { QUIZZES } from '../web/core/data.js';
-import { AIServiceError } from '../server/ai.mjs';
+import { AIServiceError, createAI } from '../server/ai.mjs';
 
 async function fixture(t, overrides = {}) {
   let time = 1000000;
@@ -111,4 +111,23 @@ test('cancelar un análisis detiene la llamada y no guarda un resultado tardío'
   const job = (await f.call('/study', token, input)).body;
   await f.call(`/study/jobs/${job.id}/cancel`, token, {});
   assert.equal((await f.call(`/study/jobs/${job.id}`, token)).body.status, 'cancelled');
+});
+test('el repaso completo supera un rechazo opcional de Gemini y cobra exactamente dos solicitudes globales', async t => {
+  const first = 'La fotosíntesis transforma energía luminosa en energía química.', second = 'Las raíces absorben agua y nutrientes del suelo.';
+  const output = { insufficient_material: false, title: 'Las plantas', summary: 'Las plantas obtienen recursos y transforman energía.', key_points: [{ idea: 'Transformación de energía', source_id: 0, quote: first }, { idea: 'Recursos del suelo', source_id: 0, quote: second }], questions: [{ prompt: '¿Qué transforma la fotosíntesis?', options: ['Energía luminosa', 'Piedras', 'Sonido'], answer: 0, explanation: first, source_id: 0, quote: first }, { prompt: '¿Qué absorben las raíces?', options: ['Luz', 'Agua y nutrientes', 'Sonido'], answer: 1, explanation: second, source_id: 0, quote: second }] };
+  let calls = 0;
+  const provider = createAI({ provider: 'gemini', key: 'test-only-key', reportDiagnostic: () => {}, transport: async (_url, init) => {
+    calls++; const body = JSON.parse(init.body);
+    if (body.generationConfig.thinkingConfig) return Response.json({ error: { status: 'INVALID_ARGUMENT', message: 'thinking_config.thinking_level not supported' } }, { status: 400 });
+    return Response.json({ candidates: [{ finishReason: 'STOP', content: { parts: [{ text: JSON.stringify(output) }] } }] });
+  } });
+  const f = await fixture(t, { aiDailyLimit: 2, ai: { ...provider, generate: (sources, topic, context) => provider.generate(sources, topic, { ...context, retryDelayMs: 0 }) } });
+  const token = await f.player('Ana'), input = { background: true, sources: [{ name: 'Clase.pdf · página 1', text: `${first} ${second} ${first} ${second}` }] };
+  const started = await f.call('/study', token, input); assert.equal(started.status, 202);
+  let job = started.body;
+  for (let n = 0; n < 20 && job.status === 'running'; n++) { await new Promise(resolve => setTimeout(resolve, 10)); job = (await f.call(`/study/jobs/${job.id}`, token)).body; }
+  assert.equal(job.status, 'completed'); assert.equal(job.game.questions.length, 2); assert.equal(calls, 2);
+  assert.equal((await f.call('/study', token, input)).body.id, job.id); assert.equal(calls, 2);
+  const limited = await f.call('/study', token, { ...input, topic: 'Otro enfoque' });
+  assert.equal(limited.status, 429); assert.equal(limited.body.code, 'winy_daily_requests_limit'); assert.equal(calls, 2);
 });

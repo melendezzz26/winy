@@ -46,7 +46,13 @@ Desde 0.4.0 el límite por jugador cuenta **cinco juegos completados al día**; 
 
 Un `503 ServiceUnavailable` del panel de Google indica indisponibilidad del proveedor, mientras que un `429` puede indicar un límite. Winy devuelve códigos diferentes: `ai_provider_unavailable`, `ai_rate_limited`, `ai_daily_quota_exhausted`, `winy_daily_games_limit` y `winy_daily_requests_limit`. No conviene interpretar todos como falta de crédito.
 
-La generación usa tareas en segundo plano con estado y cancelación. Solo reintenta una vez ante HTTP 502/503/504; no reintenta cuota, clave inválida o modelo inaccesible. Gemini 3 Flash usa nivel de razonamiento `minimal`, hasta 6 preguntas y 4.096 tokens de salida, para reducir la espera. Cada intento tiene un máximo de 27 segundos y la tarea tiene un máximo de 60 segundos. La lectura del PDF ocurre antes y muestra la página que está leyendo.
+La generación usa tareas en segundo plano con estado y cancelación. La solicitud REST usa el enum canónico `MINIMAL` para el razonamiento de Gemini 3 Flash, hasta 6 preguntas y 4.096 tokens de salida. Si Google rechaza específicamente ese ajuste opcional, se retira y se permite una salida de hasta 8.192 tokens, conservando modelo, fuentes y esquema de citas.
+
+La recuperación de compatibilidad y los fallos HTTP 502/503/504 comparten **un único reintento**. No se reintentan cuota, clave inválida, modelo inaccesible ni errores 400 sin identificar. La segunda llamada exige reservar otro intento del cupo global. Cada intento tiene un máximo de 27 segundos y la tarea uno de 60 segundos. La lectura del PDF ocurre antes y muestra la página que está leyendo.
+
+Si Google devuelve un error 400, Render registra un evento `gemini_request_rejected` con una referencia, estado del proveedor y nombres conocidos de campos rechazados. No registra el mensaje original de Google, las claves, los apuntes ni los nombres de archivo. Si la tarea falla, la pantalla muestra la referencia para localizar ese evento.
+
+Un `401` de Winy después de un despliegue puede corresponder a una sesión antigua. Un invitado se identifica de nuevo y reenvía sus apuntes una sola vez; una cuenta con correo conserva su progreso local y pide volver a entrar. Esto es independiente del rechazo de parámetros de Gemini.
 
 Los textos extraídos se envían a Google cuando eliges Gemini. Su tratamiento depende de las [condiciones de Gemini API](https://ai.google.dev/gemini-api/terms) y del plan que utilices. No se promete almacenamiento o tratamiento privado por el hecho de usar una cuota gratuita.
 
