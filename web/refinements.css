@@ -1,0 +1,15 @@
+/* Geographic canvas: one shared projection for the country and all markers. */
+.destination-tabs{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:9px;overflow:visible;margin:24px 0 18px;padding:0}
+.destination-tabs .pill{min-width:0;font-size:14px;padding:13px 8px;white-space:normal;line-height:1.3}
+.map-wrap{aspect-ratio:450/520;background:#e8f0eb}
+.map-key{position:absolute;top:19px;left:19px;font-size:10px;font-weight:800;color:#6e8776;letter-spacing:.12em}
+.peru-map{display:block;width:100%;height:100%}
+.map-marker .map-hit{fill:transparent;stroke:none}
+.map-marker .map-pin{fill:#fffdf0;stroke:#4d7259;stroke-width:2}
+.map-marker.active .map-pin{r:10;fill:#edbf62;stroke-width:2.5}
+.map-marker text{font-size:12px;stroke-width:4px}
+.map-marker:focus .map-pin,.map-marker:hover .map-pin{fill:#f2ce7f}
+.map-reset{font-size:11px;padding:10px 13px;top:13px;right:13px}
+.toast{top:max(16px,env(safe-area-inset-top));bottom:auto;max-width:calc(100% - 40px);font-size:14px}
+@media(max-width:600px){.destination-tabs .pill{font-size:12px;padding:12px 6px}.map-wrap{border-radius:26px}.map-key{font-size:9px;top:16px;left:16px}.map-reset{font-size:10px}.toast{font-size:13px}}
+.center{text-align:center}.room-code{font-size:48px;letter-spacing:.15em;font-weight:900;text-align:center;color:var(--green);margin:24px 0;font-variant-numeric:tabular-nums}.room-players{padding:20px;border-radius:20px;background:var(--pale);margin-bottom:23px}.room-players p+p{margin-top:12px}.local-duo{border-top:1px solid var(--line);margin-top:30px;padding-top:25px}.local-duo h2{font-size:24px;margin-bottom:10px}.local-duo p,.empty-state{font-size:15px;color:var(--muted)}.recent-match{display:grid;grid-template-columns:1fr auto;gap:8px;padding:18px;margin:14px 0}.recent-match small{color:var(--muted);grid-column:1/-1}.analysis-summary{margin:20px 0;font-size:17px}.key-points article{margin:16px 0;padding:18px;background:#eef2e5;border-radius:20px}.key-points h3{font-size:20px;margin-bottom:12px}.key-points blockquote{font-size:14px;margin:0;border-left:3px solid #a4b681;padding-left:12px;line-height:1.6}.key-points cite{display:block;font-size:12px;font-style:normal;color:var(--muted);margin-top:8px}

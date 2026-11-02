@@ -1,0 +1,13 @@
+.local/
+node_modules/
+web/vendor/
+android/.gradle/
+android/local.properties
+android/**/build/
+*.log
+dist/
+winy-android-prueba.zip
+*.keystore
+.env
+.env.*
+!.env.example

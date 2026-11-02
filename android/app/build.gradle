@@ -1,0 +1,45 @@
+plugins { id 'com.android.application' }
+def apiBase = (System.getenv('WINY_API_BASE') ?: '').replaceAll('/+$', '')
+if (apiBase) {
+    def endpoint = new URI(apiBase)
+    if (endpoint.scheme != 'https' || !endpoint.host || endpoint.userInfo || endpoint.query || endpoint.fragment || endpoint.path) {
+        throw new GradleException('WINY_API_BASE debe ser un origen HTTPS, por ejemplo https://winy.example.com, sin credenciales ni rutas.')
+    }
+}
+
+android {
+    namespace 'pe.winy.app'
+    compileSdk 35
+    buildToolsVersion '35.0.0'
+
+    defaultConfig {
+        applicationId 'pe.winy.app'
+        minSdk 26
+        targetSdk 35
+        versionCode 2
+        versionName '0.2.0'
+        buildConfigField 'String', 'API_BASE', groovy.json.JsonOutput.toJson(apiBase)
+    }
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+    sourceSets.main.assets.srcDir(layout.buildDirectory.dir('generated/winyAssets'))
+    buildFeatures { buildConfig true }
+    signingConfigs.debug.storeFile rootProject.file('../.local/winy-debug.keystore')
+    buildTypes {
+        debug { applicationIdSuffix '.debug'; versionNameSuffix '-debug' }
+    }
+    lint { abortOnError true }
+}
+
+tasks.register('syncWebAssets', Sync) {
+    from rootProject.file('../web')
+    into layout.buildDirectory.dir('generated/winyAssets')
+    doFirst {
+        if (!rootProject.file('../web/vendor/pdf.mjs').isFile()) {
+            throw new GradleException('Faltan los lectores locales. Ejecuta npm ci y npm run postinstall desde la raíz.')
+        }
+    }
+}
+tasks.named('preBuild').configure { dependsOn 'syncWebAssets' }

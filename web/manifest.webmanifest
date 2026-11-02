@@ -1,0 +1,10 @@
+{
+  "name": "Winy · Tu pequeña gran aventura",
+  "short_name": "Winy",
+  "lang": "es",
+  "start_url": "./",
+  "display": "standalone",
+  "background_color": "#f9f8f0",
+  "theme_color": "#385b46",
+  "icons": [{ "src": "assets/logo.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }]
+}
