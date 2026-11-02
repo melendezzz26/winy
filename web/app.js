@@ -5,12 +5,15 @@ import { pet } from './core/pets.js';
 import { peruMap } from './core/map.js';
 import { serviceStatus, analyze, currentName } from './core/connection.js';
 import { createOnline } from './core/online.js';
+import { MISSIONS, completeDestination, companionMessage } from './core/gameplay.js';
 
 const app = document.querySelector('#app');
 const dialog = document.querySelector('#dialog');
 let state;
 try { state = restoreState(localStorage.getItem(STORAGE_KEY)); } catch { state = restoreState(null); }
+let greetingIndex = 0;
 let service = { online: false, ai: false, provider: 'openai' };
+let serviceCheck = null;
 let view = 'home', selectedPet = state.pet, destination = null, modal = null, quiz = null, toastTimer;
 const esc = value => String(value ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
 const paths = {
@@ -39,7 +42,7 @@ function toast(message) {
   clearTimeout(toastTimer); toastTimer = setTimeout(() => el.classList.remove('visible'), 2500);
 }
 function scene(p = state.pet, item = state.equipped, message = '¿Qué descubrimos hoy?', dress = false) {
-  return `<div class="scene"><svg class="landscape" viewBox="0 0 540 340" preserveAspectRatio="none" aria-hidden="true"><rect width="540" height="340" fill="#e1ecd6"/><circle cx="453" cy="72" r="55" fill="#edf0ce"/><circle cx="453" cy="72" r="40" fill="#fbebba"/><path d="M0 93q100 0 212 104L300 340H0Z" fill="#bccdac"/><path d="M540 115q-87-61-263 70L188 340h352Z" fill="#cdd9b7"/><path d="M0 251q263-48 540 0v89H0Z" fill="#e4d8af"/><path d="M0 251q263-48 540 0" fill="none" stroke="#d5c99e" stroke-width="2"/><ellipse cx="270" cy="290" rx="119" ry="23" fill="#d6c89d" stroke="#cabb8f" stroke-width="2"/><g stroke="#91a772" stroke-width="3"><path d="m44 292 17-49m-13 38 28-16m-24 6-12-15"/><g fill="#c9dc8d" stroke="none"><ellipse cx="41" cy="253" rx="5" ry="12" transform="rotate(-27 41 253)"/><ellipse cx="58" cy="249" rx="5" ry="12" transform="rotate(20 58 249)"/><ellipse cx="71" cy="264" rx="12" ry="5" transform="rotate(-25 71 264)"/><ellipse cx="61" cy="282" rx="12" ry="5"/></g></g><path d="m482 279 22 0-4 15h-14Z" fill="#b89977"/><path d="M493 279v-27m0 18-9-8m9 1 10-8" stroke="#879e65" stroke-width="2"/><g fill="#b9cf89"><ellipse cx="485" cy="260" rx="7" ry="3" transform="rotate(35 485 260)"/><ellipse cx="501" cy="256" rx="7" ry="3" transform="rotate(-30 501 256)"/><ellipse cx="492" cy="253" rx="3" ry="7"/></g></svg><span class="speech">${esc(message)}</span>${pet(p, item, 'scene-pet')}${dress ? button(icon('style'), 'nav', 'data-view="style" aria-label="Vestir a mi compañero"', 'dress-button') : ''}</div>`;
+  return `<div class="scene"><svg class="landscape" viewBox="0 0 540 340" preserveAspectRatio="none" aria-hidden="true"><rect width="540" height="340" fill="#e1ecd6"/><circle cx="453" cy="72" r="55" fill="#edf0ce"/><circle cx="453" cy="72" r="40" fill="#fbebba"/><path d="M0 93q100 0 212 104L300 340H0Z" fill="#bccdac"/><path d="M540 115q-87-61-263 70L188 340h352Z" fill="#cdd9b7"/><path d="M0 251q263-48 540 0v89H0Z" fill="#e4d8af"/><path d="M0 251q263-48 540 0" fill="none" stroke="#d5c99e" stroke-width="2"/><ellipse cx="270" cy="290" rx="119" ry="23" fill="#d6c89d" stroke="#cabb8f" stroke-width="2"/><g stroke="#91a772" stroke-width="3"><path d="m44 292 17-49m-13 38 28-16m-24 6-12-15"/><g fill="#c9dc8d" stroke="none"><ellipse cx="41" cy="253" rx="5" ry="12" transform="rotate(-27 41 253)"/><ellipse cx="58" cy="249" rx="5" ry="12" transform="rotate(20 58 249)"/><ellipse cx="71" cy="264" rx="12" ry="5" transform="rotate(-25 71 264)"/><ellipse cx="61" cy="282" rx="12" ry="5"/></g></g><path d="m482 279 22 0-4 15h-14Z" fill="#b89977"/><path d="M493 279v-27m0 18-9-8m9 1 10-8" stroke="#879e65" stroke-width="2"/><g fill="#b9cf89"><ellipse cx="485" cy="260" rx="7" ry="3" transform="rotate(35 485 260)"/><ellipse cx="501" cy="256" rx="7" ry="3" transform="rotate(-30 501 256)"/><ellipse cx="492" cy="253" rx="3" ry="7"/></g></svg><span class="speech" aria-live="polite">${esc(message)}</span>${pet(p, item, 'scene-pet')}<button class="pet-interact" data-action="pet-greet" data-pet="${p}" aria-label="Saludar a ${esc(state.names[p] || p)}"></button><span class="pet-touch-hint">Toca a tu compañero ♡</span>${dress ? button(icon('style'), 'nav', 'data-view="style" aria-label="Vestir a mi compañero"', 'dress-button') : ''}</div>`;
 }
 function header() { return `<header class="topbar"><button class="brand" data-action="nav" data-view="home" aria-label="Winy, ir al hogar"><img src="assets/logo.svg" alt=""><span>winy<span class="spark">✦</span></span></button><div class="stats"><span class="pill">✦ Nv. ${level(state)}</span><span class="pill coins" aria-label="${state.coins} monedas">🪙 ${state.coins}</span></div></header>`; }
 function heading(eyebrow, title, subtitle) { return `<div class="page-heading"><p class="eyebrow">${eyebrow}</p><h1 tabindex="-1">${title}</h1><p class="subtitle">${subtitle}</p></div>`; }
@@ -48,6 +51,10 @@ function choices(selected, modalChoice = false) { return `<div class="pet-grid" 
 function onboarding() {
   return `<main id="content" class="onboarding"><img class="welcome-logo" src="assets/logo.svg" alt="Winy"><p class="eyebrow">Tu pequeña gran aventura</p><h1>Todo empieza<br>con un compañero.</h1><p class="subtitle">Estudia, juega y descubre el Perú.<br>¿Quién va contigo?</p><form id="onboarding-form">${choices(selectedPet)}<label for="pet-name">¿Cómo se llamará tu compañero?</label><input id="pet-name" name="petName" required maxlength="28" value="${esc(state.names[selectedPet])}" autocomplete="off"><button class="primary" type="submit">¡Vamos a la aventura! ${icon('arrow')}</button></form><p class="welcome-note">Tu progreso queda guardado en este navegador.</p></main>`;
 }
+function passport() {
+  const count = Object.keys(state.passport || {}).length;
+  return `<section class="passport"><div class="section-title"><h2>Tu pasaporte</h2><span class="tag">${count} de 6 sellos</span></div><p>${count === 6 ? '¡Ya eres Explorador del Perú! Puedes seguir descubriendo y practicar.' : 'Consigue 2 de 3 aciertos en cada destino para ganar su sello.'}</p><div class="passport-grid">${DESTINATIONS.map(d => `<button class="passport-stamp ${state.passport[d.id] ? 'earned' : ''}" data-action="passport-destination" data-destination="${d.id}" aria-label="${d.name}${state.passport[d.id] ? ', sello conseguido' : ', explorar'}"><span aria-hidden="true">${d.icon}</span><strong>${d.name}</strong><small>${state.passport[d.id] ? '✓ Conseguido' : 'Por descubrir'}</small></button>`).join('')}</div></section>`;
+}
 function home() {
   const done = state.habits[today()] || [];
   const habits = [
@@ -55,15 +62,15 @@ function home() {
     ['focus', '📚', 'Un ratito de enfoque', 'Estudia sin distracciones · +20 XP'],
     ['move', '🌿', 'Una pausa para ti', 'Estírate y recarga energía · +20 XP']
   ];
-  return `${heading('Pequeños hábitos, grandes logros', 'Tu aventura de hoy<span class="gold-dot">.</span>', 'Un ratito para ti. Un gran paso juntos.')}${scene(state.pet, state.equipped, '¿Qué descubrimos hoy?', true)}<div class="pet-info"><div><h2>${esc(state.names[state.pet])} <span class="seed">🌱</span></h2><p>${petData().kind} · Explorador nivel ${level(state)}</p></div>${button(`Cambiar ${icon('arrow')}`, 'change-pet', '', 'pill change')}</div><div class="xp-label"><span>Un poquito más, un nivel más</span><span>${state.xp % 100} / 100 XP</span></div><progress class="xp" value="${state.xp % 100}" max="100" aria-label="Progreso al siguiente nivel"></progress><button class="challenge" data-action="quiz" data-quiz="peru"><span class="challenge-icon">ϟ</span><span><strong>Tu reto de 2 minutos</strong><small>Conoce el Perú · juega y gana XP</small></span>${icon('arrow')}</button><div class="section-title"><h2>Tus pequeñas victorias</h2><span class="tag">${done.length} de 3</span></div><div class="habit-list">${habits.map(([id, emoji, title, desc]) => `<button class="habit card ${done.includes(id) ? 'completed' : ''}" data-action="habit" data-habit="${id}"><span class="tile-icon">${emoji}</span><span><strong>${title}</strong><small>${done.includes(id) ? '¡Un pequeño gran paso! · Completado hoy' : desc}</small></span><span class="habit-check" aria-label="${done.includes(id) ? 'Completado' : 'Pendiente'}">${done.includes(id) ? icon('check') : ''}</span></button>`).join('')}</div><p class="footnote">Cada pequeño paso cuenta. Mañana, una nueva aventura.</p>`;
+  return `${heading('Pequeños hábitos, grandes logros', 'Tu aventura de hoy<span class="gold-dot">.</span>', 'Un ratito para ti. Un gran paso juntos.')}${scene(state.pet, state.equipped, '¿Qué descubrimos hoy?', true)}<div class="pet-info"><div><h2>${esc(state.names[state.pet])} <span class="seed">🌱</span></h2><p>${petData().kind} · Explorador nivel ${level(state)}</p></div>${button(`Cambiar ${icon('arrow')}`, 'change-pet', '', 'pill change')}</div><div class="xp-label"><span>Un poquito más, un nivel más</span><span>${state.xp % 100} / 100 XP</span></div><progress class="xp" value="${state.xp % 100}" max="100" aria-label="Progreso al siguiente nivel"></progress><button class="challenge" data-action="quiz" data-quiz="peru"><span class="challenge-icon">ϟ</span><span><strong>Tu reto de 2 minutos</strong><small>Conoce el Perú · juega y gana XP</small></span>${icon('arrow')}</button><div class="section-title"><h2>Tus pequeñas victorias</h2><span class="tag">${done.length} de 3</span></div><div class="habit-list">${habits.map(([id, emoji, title, desc]) => `<button class="habit card ${done.includes(id) ? 'completed' : ''}" data-action="habit" data-habit="${id}"><span class="tile-icon">${emoji}</span><span><strong>${title}</strong><small>${done.includes(id) ? '¡Un pequeño gran paso! · Completado hoy' : desc}</small></span><span class="habit-check" aria-label="${done.includes(id) ? 'Completado' : 'Pendiente'}">${done.includes(id) ? icon('check') : ''}</span></button>`).join('')}</div>${passport()}<p class="footnote">Cada pequeño paso cuenta. Mañana, una nueva aventura.</p>`;
 }
 function quizCard(q, custom = false) { return `<button class="card quiz-card" data-action="${custom ? 'review-game' : 'quiz'}" data-quiz="${esc(q.id)}"><span class="tile-icon">${esc(q.icon || '📚')}</span><span><strong>${esc(q.title)}</strong><small>${q.questions.length} preguntas · ${esc(q.category)}</small><span class="tag">Jugar + XP</span></span>${icon('arrow')}</button>`; }
 function study() {
-  return `${heading('Aprende a tu manera', 'De apuntes a aventura.', 'Tú pones el tema. Tu compañero va contigo.')}<section class="study-hero"><span class="tag">Tu rincón de estudio</span><h2>¿Qué quieres<br>descubrir hoy?</h2><p>Sube tus apuntes y conviértelos<br>en un juego para completar<br>palabras.</p>${pet(state.pet, state.equipped)}</section>${button(`${icon('upload')} Crear juego con mis archivos`, 'notes')}<div class="section-title"><h2>Listos para jugar</h2><span class="tag">Solo o en dúo</span></div><div class="quiz-list">${Object.values(QUIZZES).map(q => quizCard(q)).join('')}${state.games.map(q => quizCard(q, true)).join('')}</div><button class="focus-card" data-action="focus"><span class="tile-icon">◷</span><span><strong>Modo enfoque</strong><small>Una tarea pequeña. Un momento para ti.</small></span>${icon('arrow')}</button>`;
+  return `${heading('Aprende a tu manera', 'De apuntes a aventura.', 'Tú pones el tema. Tu compañero va contigo.')}<section class="study-hero"><span class="tag">Tu rincón de estudio</span><h2>¿Qué quieres<br>descubrir hoy?</h2><p>Trae tus apuntes y elige<br>ideas clave con trivia o<br>completar palabras.</p>${pet(state.pet, state.equipped)}</section>${button(`${icon('upload')} Crear juego con mis archivos`, 'notes')}<div class="section-title"><h2>Listos para jugar</h2><span class="tag">Solo o en dúo</span></div><div class="quiz-list">${Object.values(QUIZZES).map(q => quizCard(q)).join('')}${state.games.map(q => quizCard(q, true)).join('')}</div><button class="focus-card" data-action="focus"><span class="tile-icon">◷</span><span><strong>Modo enfoque</strong><small>Una tarea pequeña. Un momento para ti.</small></span>${icon('arrow')}</button>`;
 }
-function map() { return peruMap(destination); }
+function map() { return peruMap(destination, state.passport); }
 function adventure() {
-  return `${heading('Un país, muchas aventuras', 'El Perú te espera.', 'Toca un destino, acércate y empieza tu reto.')}<div class="destination-tabs" role="group" aria-label="Destinos">${DESTINATIONS.map(d => `<button class="pill ${destination?.id === d.id ? 'active' : ''}" data-action="destination" data-destination="${d.id}" aria-pressed="${destination?.id === d.id}">${d.icon} ${d.name}</button>`).join('')}</div>${map()}<p class="map-caption">Contorno de Natural Earth · Destinos situados con coordenadas geográficas.</p><section class="destination-card"><span class="tag">${destination ? destination.region : 'Elige tu destino'}</span><h2>${destination ? destination.icon + ' ' + destination.title : '¿Costa, Andes o Amazonía?'}</h2><p>${destination ? destination.description : 'Cada destino abre un reto de cultura, naturaleza o bienestar. Tu próxima aventura empieza con un toque.'}</p>${destination ? button(`Explorar ${destination.name} ${icon('arrow')}`, 'quiz', `data-quiz="${destination.quiz}"`) : ''}</section>`;
+  return `${heading('Un país, muchas aventuras', 'El Perú te espera.', 'Toca un destino, acércate y empieza tu reto.')}<div class="destination-tabs" role="group" aria-label="Destinos">${DESTINATIONS.map(d => `<button class="pill ${destination?.id === d.id ? 'active' : ''}" data-action="destination" data-destination="${d.id}" aria-pressed="${destination?.id === d.id}">${d.icon} ${d.name}</button>`).join('')}</div>${map()}<p class="map-caption">Contorno de Natural Earth · Destinos situados con coordenadas geográficas.</p><section class="destination-card"><span class="tag">${destination ? destination.region : 'Elige tu destino'}</span><h2>${destination ? destination.icon + ' ' + destination.title : '¿Costa, Andes o Amazonía?'}</h2><p>${destination ? destination.description : 'Cada destino abre un reto de cultura, naturaleza o bienestar. Tu próxima aventura empieza con un toque.'}</p>${destination ? `<p class="mission-goal">${state.passport[destination.id] ? '✓ Sello conseguido · Puedes mejorar tu marca' : 'Tu misión: 2 de 3 aciertos para conseguir el sello'}</p>` : ''}${destination ? button(`${state.passport[destination.id] ? 'Volver a jugar en' : 'Explorar'} ${destination.name} ${icon('arrow')}`, 'mission', `data-destination="${destination.id}"`) : ''}</section>`;
 }
 function friends() {
   const recent = (state.matches || []).slice(-5).reverse();
@@ -97,13 +104,35 @@ function renderPetPicker() {
   openModal('Tu compañero de aventuras', `<p class="subtitle">Cuatro amigos, una misma aventura. Tu progreso se conserva.</p><form id="pet-form">${choices(selectedPet, true)}<label for="change-name">¿Cómo se llamará tu compañero?</label><input id="change-name" name="petName" maxlength="28" required value="${esc(state.names[selectedPet])}"><button class="primary" type="submit">Seguir con mi compañero ${icon('check')}</button></form>`, 'pet');
 }
 function showNotes() {
-  openModal('Tus apuntes, tu próximo reto', `<p class="small muted">Elige cómo estudiar y trae el contenido de tu clase.</p><form id="notes-form"><label for="study-mode">Tipo de estudio</label><select id="study-mode" name="mode"><option value="ai" ${service.ai ? 'selected' : 'disabled'}>Ideas clave y trivia con IA${service.ai ? '' : ' · pendiente de activar'}</option><option value="local" ${service.ai ? '' : 'selected'}>Completar palabras · sin conexión</option></select><label for="topic">¿Qué tema quieres estudiar?</label><input id="topic" name="topic" maxlength="100" placeholder="Ej. La fotosíntesis"><div class="upload-area">${icon('upload')}<strong>Trae tus archivos</strong><p>PDF con texto, Word (.docx), PowerPoint (.pptx), TXT o Markdown<br>Máximo 5 archivos · 8 MB por archivo</p><input id="files" type="file" accept=".pdf,.docx,.pptx,.txt,.md,.markdown" multiple aria-label="Elegir archivos de apuntes"></div><label for="notes">O pega un fragmento de tus apuntes</label><textarea id="notes" name="notes" rows="5" maxlength="80000" placeholder="Pega varios párrafos del tema que estás estudiando…"></textarea><p class="form-error" id="notes-error" role="alert"></p><button type="submit" class="primary">Crear mi juego ${icon('star')}</button></form><p class="notice">El modo IA envía el texto extraído al servicio de Winy y a ${service.provider === 'gemini' ? 'Google Gemini' : 'OpenAI'} para seleccionar ideas y crear la trivia. Cada cita se comprueba contra tus apuntes. El modo sin conexión procesa el texto aquí. Hasta 40 páginas de PDF y 80 diapositivas; los escaneos necesitan texto legible.</p>`, 'notes');
+  openModal('Tus apuntes, tu próximo reto', `<p class="small muted">Elige cómo estudiar y trae el contenido de tu clase.</p><form id="notes-form"><p id="service-state" class="small muted" role="status"></p><button type="button" class="pill service-retry" data-action="retry-service">Actualizar conexión</button><label for="study-mode">Tipo de estudio</label><select id="study-mode" name="mode"><option value="ai" ${service.ai ? 'selected' : 'disabled'}>Ideas clave y trivia con IA${service.ai ? '' : ' · pendiente de activar'}</option><option value="local" ${service.ai ? '' : 'selected'}>Completar palabras · sin conexión</option></select><label for="topic">¿Qué tema quieres estudiar?</label><input id="topic" name="topic" maxlength="100" placeholder="Ej. La fotosíntesis"><div class="upload-area">${icon('upload')}<strong>Trae tus archivos</strong><p>PDF con texto, Word (.docx), PowerPoint (.pptx), TXT o Markdown<br>Máximo 5 archivos · 8 MB por archivo</p><input id="files" type="file" accept=".pdf,.docx,.pptx,.txt,.md,.markdown" multiple aria-label="Elegir archivos de apuntes"></div><label for="notes">O pega un fragmento de tus apuntes</label><textarea id="notes" name="notes" rows="5" maxlength="80000" placeholder="Pega varios párrafos del tema que estás estudiando…"></textarea><p class="form-error" id="notes-error" role="alert"></p><button type="submit" class="primary">Crear mi juego ${icon('star')}</button></form><p class="notice">El modo IA envía el texto extraído al servicio de Winy y a <span id="ai-provider-name">${service.provider === 'gemini' ? 'Google Gemini' : 'OpenAI'}</span> para seleccionar ideas y crear la trivia. Cada cita se comprueba contra tus apuntes. El modo sin conexión procesa el texto aquí. Hasta 40 páginas de PDF y 80 diapositivas; los escaneos necesitan texto legible.</p>`, 'notes');
+  refreshService();
+}
+function updateServiceControls() {
+  if (modal !== 'notes') return;
+  const option = dialog.querySelector('#study-mode option[value=ai]');
+  if (!option) return;
+  option.disabled = !service.ai;
+  option.textContent = `Ideas clave y trivia con IA${service.ai ? '' : ' · pendiente de activar'}`;
+  dialog.querySelector('#ai-provider-name').textContent = service.provider === 'gemini' ? 'Google Gemini' : 'OpenAI';
+  dialog.querySelector('#service-state').textContent = serviceCheck ? 'Conectando con el servicio… Puedes preparar tus apuntes mientras tanto.' : service.ai ? 'La IA está configurada. Elige ideas clave y trivia para probar tus apuntes.' : service.online ? 'La IA aún no está activada en el servicio. Puedes estudiar sin conexión.' : 'El servicio no responde. Reintenta en unos segundos o estudia sin conexión.';
+  const retry = dialog.querySelector('[data-action=retry-service]');
+  retry.disabled = Boolean(serviceCheck);
+  retry.textContent = serviceCheck ? 'Conectando…' : 'Actualizar conexión';
+}
+function refreshService() {
+  if (serviceCheck) { updateServiceControls(); return serviceCheck; }
+  serviceCheck = serviceStatus().then(result => { service = result; }).catch(() => { service = { ...service, online: false, ai: false }; }).finally(() => {
+    serviceCheck = null; updateServiceControls();
+    if (state.onboarded && ['friends', 'study'].includes(view) && !dialog.open) render();
+  });
+  updateServiceControls();
+  return serviceCheck;
 }
 function showAnalysis(game) {
   openModal(game.title, `<span class="tag">Tus ideas clave</span><p class="analysis-summary">${esc(game.summary)}</p><div class="key-points">${(Array.isArray(game.keyPoints) ? game.keyPoints : []).map(p => `<article><h3>${esc(p.idea)}</h3><blockquote>${esc(p.evidence)}<cite>${esc(p.source)}</cite></blockquote></article>`).join('')}</div>${button('Jugar mi trivia', 'custom-quiz', `data-quiz="${esc(game.id)}"`)}`, 'analysis');
 }
-function startQuiz(game, players = null) {
-  quiz = { game, questions: players ? game.questions.slice(0, 4) : game.questions, index: 0, score: 0, scores: [0, 0], players, answered: false, result: null };
+function startQuiz(game, players = null, missionId = null) {
+  quiz = { game, missionId, questions: players ? game.questions.slice(0, 4) : game.questions, index: 0, score: 0, scores: [0, 0], players, answered: false, result: null };
   showQuestion();
 }
 function showQuestion() {
@@ -131,10 +160,12 @@ function answerQuiz(answer) {
 function endQuiz() {
   const rewardScore = quiz.players ? quiz.scores[0] : quiz.score;
   quiz.result = finishQuiz(state, (quiz.players ? 'duo-' : '') + quiz.game.id, rewardScore, quiz.questions.length);
+  const stamp = quiz.missionId ? completeDestination(state, quiz.missionId, quiz.score, quiz.questions.length) : null;
   save(); render();
   let result = '¡Tu aventura sigue creciendo!';
   if (quiz.players) result = quiz.scores[0] === quiz.scores[1] ? '¡Un gran empate!' : `¡Ganó ${quiz.players[quiz.scores[0] > quiz.scores[1] ? 0 : 1]}!`;
-  openModal('Pequeños pasos, grandes logros', `<div class="result"><span class="result-star" aria-hidden="true">✦</span><h3>${esc(result)}</h3><p>${quiz.score} de ${quiz.questions.length} respuestas correctas</p>${quiz.players ? `<div class="scoreboard">${quiz.players.map((p, i) => `<div><strong>${esc(p)}</strong><span>${quiz.scores[i]} puntos</span></div>`).join('')}</div>` : ''}<div class="reward-pills"><span class="pill">+${quiz.result.xp} XP</span><span class="pill coins">🪙 +${quiz.result.coins}</span></div><p class="small muted">${quiz.result.claimed ? 'Ya recibiste la recompensa de este juego hoy. Puedes seguir practicando.' : quiz.players ? 'Las recompensas de tu jugador se guardan en este dispositivo.' : '¡Lo que aprendes hoy te acompaña mañana!'}</p>${button('Seguir mi aventura', 'close')}${button('Volver a jugar', 'replay', '', 'secondary full')}</div>`, 'result');
+  const stampMessage = stamp ? `<p class="stamp-result">${stamp.earned ? '✦ ¡Nuevo sello para tu pasaporte!' : stamp.already ? '✓ Este destino ya forma parte de tu pasaporte.' : `Con ${stamp.required} aciertos consigues este sello. ¡Puedes intentarlo otra vez!`}</p>` : '';
+  openModal('Pequeños pasos, grandes logros', `<div class="result"><span class="result-star" aria-hidden="true">✦</span><h3>${esc(result)}</h3><p>${quiz.score} de ${quiz.questions.length} respuestas correctas</p>${stampMessage}${quiz.players ? `<div class="scoreboard">${quiz.players.map((p, i) => `<div><strong>${esc(p)}</strong><span>${quiz.scores[i]} puntos</span></div>`).join('')}</div>` : ''}<div class="reward-pills"><span class="pill">+${quiz.result.xp} XP</span><span class="pill coins">🪙 +${quiz.result.coins}</span></div><p class="small muted">${quiz.result.claimed ? 'Tu mejor marca de hoy está guardada. Mejora tus aciertos para ganar la diferencia de XP y monedas.' : quiz.players ? 'Las recompensas de tu jugador se guardan en este dispositivo.' : '¡Lo que aprendes hoy te acompaña mañana!'}</p>${button('Seguir mi aventura', 'close')}${button('Volver a jugar', 'replay', '', 'secondary full')}</div>`, 'result');
 }
 function showDuo() {
   openModal('Una partida entre amigos', `<p class="muted">Jueguen por turnos en este teléfono. Cada pregunta cambia de jugador.</p><form id="duo-form"><label for="player1">Jugador 1</label><input id="player1" name="player1" maxlength="28" required value="Tú"><label for="player2">Jugador 2</label><input id="player2" name="player2" maxlength="28" required placeholder="Nombre de tu amigo"><label for="duo-topic">Tema</label><select id="duo-topic" name="quiz">${Object.values(QUIZZES).map(q => `<option value="${q.id}">${q.title}</option>`).join('')}</select><button class="primary" type="submit">¡Que empiece el reto!</button></form><p class="notice">Partida local. No requiere que tu amigo tenga una cuenta. Son 4 preguntas, dos por persona.</p>`, 'duo');
@@ -190,13 +221,17 @@ document.addEventListener('click', async event => {
   }
   else if (action === 'change-pet') showPetPicker();
   else if (action === 'close') closeModal();
+  else if (action === 'pet-greet') { const scene = el.closest('.scene'); scene.querySelector('.speech').textContent = companionMessage(el.dataset.pet, greetingIndex++); scene.classList.remove('pet-reacting'); void scene.offsetWidth; scene.classList.add('pet-reacting'); }
+  else if (action === 'passport-destination') { destination = DESTINATIONS.find(d => d.id === el.dataset.destination); view = 'adventure'; render(); window.scrollTo({top: 0}); }
+  else if (action === 'mission') { const id = el.dataset.destination; if (MISSIONS[id]) startQuiz(MISSIONS[id], null, id); }
   else if (action === 'quiz') startQuiz(QUIZZES[el.dataset.quiz]);
   else if (action === 'review-game') { const game = state.games.find(g => g.id === el.dataset.quiz); if (game) { if (game.summary) showAnalysis(game); else startQuiz(game); } }
   else if (action === 'custom-quiz') { const game = state.games.find(g => g.id === el.dataset.quiz); if (game) startQuiz(game); }
   else if (action === 'answer') answerQuiz(el.dataset.answer);
   else if (action === 'next-question') { if (!quiz?.answered) return; quiz.index++; quiz.answered = false; if (quiz.index === quiz.questions.length) endQuiz(); else showQuestion(); }
-  else if (action === 'replay') startQuiz(quiz.game, quiz.players);
+  else if (action === 'replay') startQuiz(quiz.game, quiz.players, quiz.missionId);
   else if (action === 'notes') showNotes();
+  else if (action === 'retry-service') refreshService();
   else if (action === 'duo') showDuo();
   else if (action === 'visit') showVisit(Number(el.dataset.friend));
   else if (action === 'add-friend') { const f = FRIENDS[Number(el.dataset.friend)]; if (f && !state.visited.includes(f.name)) state.visited.push(f.name); save(); render(); showVisit(Number(el.dataset.friend)); toast('Perfil de ejemplo añadido a tu tribu.'); }
@@ -242,7 +277,7 @@ document.addEventListener('submit', async event => {
     try {
       const fd = new FormData(form), sources = await readSources([...form.querySelector('#files').files]);
       if (fd.get('notes').trim()) sources.push({ name: 'Apuntes pegados', text: fd.get('notes') });
-      const game = fd.get('mode') === 'ai' ? await analyze(sources, fd.get('topic'), currentName() || 'Explorador') : makeStudyGame(sources, fd.get('topic'));
+      const game = form.querySelector('#study-mode').value === 'ai' ? await analyze(sources, fd.get('topic'), currentName() || 'Explorador') : makeStudyGame(sources, fd.get('topic'));
       if (modal !== 'notes' || !form.isConnected) return;
       state.games = [...state.games.filter(g => g.id !== game.id), game].slice(-10); save(); render(); if (game.summary) showAnalysis(game); else startQuiz(game);
     } catch (err) {
@@ -271,4 +306,5 @@ const online = createOnline({
   }
 });
 render(); updateTimer();
-serviceStatus().then(result => { service = result; if (state.onboarded && ['friends', 'study'].includes(view) && !dialog.open) render(); }).catch(() => {});
+refreshService();
+window.addEventListener('online', refreshService);

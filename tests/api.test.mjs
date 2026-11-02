@@ -14,7 +14,7 @@ async function fixture(t, overrides = {}) {
   t.after(async () => { server.closeAllConnections(); await new Promise(resolve => server.close(resolve)); api.close(); });
   const call = async (path, token, data) => { const response = await fetch(base + '/api' + path, { method: data ? 'POST' : 'GET', headers: { ...(data ? { 'Content-Type': 'application/json' } : {}), ...(token ? { Authorization: 'Bearer ' + token } : {}) }, body: data ? JSON.stringify(data) : undefined }); return { status: response.status, body: await response.json() }; };
   const player = async nickname => (await call('/players', null, { nickname })).body.token;
-  return { call, player, tick: n => { time += n; } };
+  return { base, call, player, tick: n => { time += n; } };
 }
 test('dos clientes entran con código, reciben preguntas sin respuestas y juegan una partida completa', async t => {
   const f = await fixture(t), a = await f.player('Ana'), b = await f.player('Luis'), c = await f.player('Tercero');
@@ -67,4 +67,19 @@ test('los errores de cuota del proveedor llegan al cliente sin invalidar la sesi
 test('el estado informa el proveedor y el modelo incluso si falta configurar su clave', async t => {
   const f=await fixture(t,{ai:{enabled:false,provider:'gemini',model:'gemini-3.8-flash'}});
   const response=await f.call('/status');assert.equal(response.status,200);assert.deepEqual(response.body,{online:true,ai:false,provider:'gemini',model:'gemini-3.8-flash'});
+});
+test('JSON inválido y fuentes malformadas se rechazan antes de gastar solicitudes de IA', async t => {
+  let calls = 0;
+  const f = await fixture(t, { ai: { enabled: true, generate: async () => { calls++; return { id: 'valid', title: 'Juego' }; } } });
+  const token = await f.player('Ana');
+  for (const raw of ['null', '[]', '"texto"', '{']) {
+    const response = await fetch(f.base + '/api/study', { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token }, body: raw });
+    assert.equal(response.status, 400); assert.match((await response.json()).error, /no válidos/);
+  }
+  for (const sources of [[null], [[]], [{}], [{ text: 3 }], Array(402).fill({ text: 'Texto de clase' })]) {
+    assert.equal((await f.call('/study', token, { sources })).status, 400);
+  }
+  assert.equal(calls, 0);
+  const input = { sources: [{ text: 'Una explicación suficiente para analizar. '.repeat(12) }] };
+  assert.equal((await f.call('/study', token, input)).status, 201); assert.equal(calls, 1);
 });

@@ -9,7 +9,7 @@ export async function request(path, { method = 'GET', data, auth = true } = {}) 
   if (!url) throw new Error('El servicio en línea aún no está activado en esta versión de Winy.');
   if (auth && !identity?.token) throw new Error('Escribe tu nombre para entrar a la sala.');
   let response;
-  try { response = await fetch(url + '/api' + path, { method, headers: { ...(data ? { 'Content-Type': 'application/json' } : {}), ...(auth ? { Authorization: `Bearer ${identity.token}` } : {}) }, body: data ? JSON.stringify(data) : undefined, signal: AbortSignal.timeout(path === '/study' ? 100000 : 12000) }); }
+  try { response = await fetch(url + '/api' + path, { method, headers: { ...(data ? { 'Content-Type': 'application/json' } : {}), ...(auth ? { Authorization: `Bearer ${identity.token}` } : {}) }, body: data ? JSON.stringify(data) : undefined, signal: AbortSignal.timeout(path === '/study' ? 100000 : path === '/status' ? 60000 : 12000) }); }
   catch { throw new Error('No pudimos conectar con Winy. Comprueba tu conexión e inténtalo de nuevo.'); }
   let payload;
   try { payload = await response.json(); } catch { throw new Error('El servicio de Winy no está disponible en este momento.'); }

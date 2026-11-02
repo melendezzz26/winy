@@ -8,14 +8,25 @@ test('el análisis conserva ideas y citas verificadas, y rechaza fuentes o citas
   const bad = example(); bad.questions[0].quote = 'Una afirmación que no aparece en el documento.'; assert.throws(() => validateAnalysis(bad, sources), /verificar una cita/);
   const missing = example(); missing.questions[0].source_id = 8; assert.throws(() => validateAnalysis(missing, sources), /verificar una cita/);
 });
+test('un análisis malformado, una cita extensa y preguntas repetidas no producen una trivia', () => {
+  for (const value of [null, [], 'texto']) assert.throws(() => validateAnalysis(value, sources), /análisis incompleto/);
+  const malformed = example(); malformed.key_points[0] = null;
+  assert.throws(() => validateAnalysis(malformed, sources), /idea válida/);
+  const stringIndex = example(); stringIndex.questions[0].source_id = '0';
+  assert.throws(() => validateAnalysis(stringIndex, sources), /verificar una cita/);
+  const repeated = example(); repeated.questions = [repeated.questions[0], { ...repeated.questions[0], prompt: '  ¿Qué transforma la fotosíntesis?  ' }];
+  assert.throws(() => validateAnalysis(repeated, sources), /repitió las preguntas/);
+  const longQuote = example(); longQuote.questions[0].quote = sources[0].text.repeat(4);
+  assert.throws(() => validateAnalysis(longQuote, [{ ...sources[0], text: sources[0].text.repeat(4) }]), /verificar una cita/);
+});
 test('la llamada usa Responses API y JSON estructurado sin introducir la clave en el juego', async () => {
   let captured;
-  const ai = createAI({ key: 'test-only-token', transport: async (url, options) => { captured = { url, options }; return { ok: true, json: async () => ({ status: 'completed', output: [{ content: [{ type: 'output_text', text: JSON.stringify(example()) }] }] }) }; } });
+  const ai = createAI({ provider: 'openai', key: 'test-only-token', transport: async (url, options) => { captured = { url, options }; return { ok: true, json: async () => ({ status: 'completed', output: [{ content: [{ type: 'output_text', text: JSON.stringify(example()) }] }] }) }; } });
   const game = await ai.generate(sources, 'Plantas'); const body = JSON.parse(captured.options.body);
   assert.equal(captured.url, 'https://api.openai.com/v1/responses'); assert.equal(body.model, 'gpt-5.4-mini'); assert.equal(body.store, false); assert.equal(body.text.format.strict, true); assert.ok(!JSON.stringify(game).includes('test-only-token'));
 });
 test('la falta de cuota se distingue del límite temporal y no expone el mensaje del proveedor', async () => {
-  const failed = (status, error) => createAI({ key: 'test-only-token', transport: async () => ({ ok: false, status, json: async () => ({ error }) }) });
+  const failed = (status, error) => createAI({ provider: 'openai', key: 'test-only-token', transport: async () => ({ ok: false, status, json: async () => ({ error }) }) });
   await assert.rejects(failed(429, { code: 'insufficient_quota', message: 'raw message test-only-sensitive' }).generate(sources, ''), error => {
     assert.equal(error.code, 'ai_quota_exhausted'); assert.equal(error.status, 503); assert.match(error.message, /facturación/); assert.ok(!error.message.includes('test-only-sensitive')); return true;
   });
@@ -23,10 +34,10 @@ test('la falta de cuota se distingue del límite temporal y no expone el mensaje
 });
 test('clave inválida, modelo inaccesible y respuesta de error no JSON conservan diagnósticos seguros', async () => {
   for (const [status, code] of [[401, 'ai_invalid_key'], [403, 'ai_access_denied'], [404, 'ai_model_unavailable'], [400, 'ai_configuration_error']]) {
-    const ai = createAI({ key: 'test-only-token', transport: async () => ({ ok: false, status, json: async () => ({ error: { message: 'private provider error' } }) }) });
+    const ai = createAI({ provider: 'openai', key: 'test-only-token', transport: async () => ({ ok: false, status, json: async () => ({ error: { message: 'private provider error' } }) }) });
     await assert.rejects(ai.generate(sources, ''), error => error.code === code && !error.message.includes('private provider error'));
   }
-  const ai = createAI({ key: 'test-only-token', transport: async () => ({ ok: false, status: 429, json: async () => { throw new Error('not JSON'); } }) });
+  const ai = createAI({ provider: 'openai', key: 'test-only-token', transport: async () => ({ ok: false, status: 429, json: async () => { throw new Error('not JSON'); } }) });
   await assert.rejects(ai.generate(sources, ''), error => error.code === 'ai_usage_limit');
 });
 test('Gemini genera el mismo juego con citas verificadas, JSON estructurado y clave solo en la cabecera', async () => {

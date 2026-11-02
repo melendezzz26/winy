@@ -29,7 +29,7 @@ try {
   const page = await (await fetch(`http://127.0.0.1:${port}/json/new?about:blank`, { method: 'PUT' })).json();
   socket = new WebSocket(page.webSocketDebuggerUrl);
   await once(socket, 'open');
-  let id = 0, studyMock = null, studyPayload = null; const pending = new Map(), errors = [];
+  let id = 0, studyMock = null, studyPayload = null, statusMock = null; const pending = new Map(), errors = [];
   socket.addEventListener('message', ({ data }) => {
     const message = JSON.parse(data);
     if (message.method === 'Fetch.requestPaused') {
@@ -37,6 +37,8 @@ try {
       if (studyMock && new URL(p.request.url).pathname === '/api/study') {
         studyPayload = JSON.parse(p.request.postData || '{}');
         cdp('Fetch.fulfillRequest', { requestId: p.requestId, responseCode: 201, responseHeaders: [{ name: 'Content-Type', value: 'application/json' }], body: Buffer.from(JSON.stringify(studyMock)).toString('base64') }).catch(error => errors.push(error.message));
+      } else if (statusMock && new URL(p.request.url).pathname === '/api/status') {
+        cdp('Fetch.fulfillRequest', { requestId: p.requestId, responseCode: 200, responseHeaders: [{ name: 'Content-Type', value: 'application/json' }], body: Buffer.from(JSON.stringify(statusMock)).toString('base64') }).catch(error => errors.push(error.message));
       } else cdp('Fetch.continueRequest', { requestId: p.requestId }).catch(error => errors.push(error.message));
     }
     if (message.id) { const cb = pending.get(message.id); if (cb) { pending.delete(message.id); message.error ? cb.reject(new Error(JSON.stringify(message.error))) : cb.resolve(message.result); } }
@@ -64,6 +66,14 @@ try {
   await click('[data-pet="llama"]'); await set('#pet-name', 'Nubecita'); await submit('#onboarding-form');
   assert.equal((await saved()).pet, 'llama'); assert.equal((await saved()).names.llama, 'Nubecita');
   await screenshot('hogar');
+  const beforeGreeting = await saved();
+  await click('[data-action="pet-greet"]');
+  assert.ok(await evaluate('document.querySelector(".scene").classList.contains("pet-reacting")'));
+  assert.equal(await evaluate('document.querySelector(".speech").textContent'), 'Vamos con calma. ¡Un paso a la vez!');
+  await click('[data-action="pet-greet"]');
+  assert.equal(await evaluate('document.querySelector(".speech").textContent'), 'Aquí estoy. ¿Descubrimos algo nuevo?');
+  assert.deepEqual(await saved(), beforeGreeting, 'Saludar no debe modificar monedas ni progreso');
+  console.log('✓ Mascota interactiva: respuestas al tocarla sin generar recompensas repetibles');
   await click('[data-action="habit"][data-habit="food"]'); await click('[data-action="complete-habit"]');
   assert.equal((await saved()).xp, 20);
   await click('[data-action="habit"][data-habit="food"]'); assert.equal(await evaluate('document.querySelector("#dialog").open'), false); assert.equal((await saved()).xp, 20);
@@ -80,6 +90,27 @@ try {
   console.log('✓ Compra y cambio de accesorios sin cobros repetidos');
   await click('[data-view="adventure"]'); await click('[data-destination="piura"]'); assert.equal(await evaluate('document.querySelector(".destination-card h2").textContent.includes("sol")'), true);
   await screenshot('aventura'); await click('[data-action="reset-map"]');
+  await click('[data-view="home"]');
+  await click('[data-action="passport-destination"][data-destination="lima"]');
+  await click('[data-action="mission"][data-destination="lima"]');
+  const beforeMission = await saved();
+  for (const answer of [0, 0, 0]) { await click(`[data-action="answer"][data-answer="${answer}"]`); await click('[data-action="next-question"]'); }
+  assert.equal((await saved()).passport.lima, undefined);
+  assert.equal((await saved()).xp, beforeMission.xp + 10);
+  assert.ok(await evaluate('document.querySelector(".stamp-result").textContent.includes("intentarlo otra vez")'));
+  await click('[data-action="replay"]');
+  for (const answer of [0, 1, 0]) { await click(`[data-action="answer"][data-answer="${answer}"]`); await click('[data-action="next-question"]'); }
+  assert.equal((await saved()).passport.lima.score, 2);
+  assert.equal((await saved()).xp, beforeMission.xp + 20); assert.equal((await saved()).coins, beforeMission.coins + 10);
+  assert.ok(await evaluate('document.querySelector(".stamp-result").textContent.includes("Nuevo sello")'));
+  await click('[data-action="close"]'); await cdp('Page.reload');
+  await waitFor('document.querySelector(".passport-stamp.earned") !== null');
+  assert.equal(await evaluate('document.querySelector(".passport .tag").textContent'), '1 de 6 sellos');
+  await evaluate('document.querySelector(".passport").scrollIntoView({block:"center"})'); await screenshot('pasaporte');
+  await click('[data-action="passport-destination"][data-destination="lima"]');
+  assert.ok(await evaluate('document.querySelector(".map-marker.stamped[data-destination=lima]") !== null'));
+  await screenshot('mapa-sellos');
+  console.log('✓ Misión de Lima: reintento, recompensa por mejora, sello y persistencia en pasaporte y mapa');
   await click('[data-view="friends"]'); await click('[data-action="online-create"]');
   await set('#online-name', 'Ana'); await set('#online-topic', 'wellbeing'); await submit('#online-form');
   await waitFor('document.querySelector(".room-code") !== null');
@@ -173,10 +204,11 @@ try {
   console.log('✓ Integración web con Atrás y compartir de Android (puente simulado)');
   const text = 'La fotosíntesis transforma energía luminosa en energía química. Las raíces absorben agua y nutrientes del suelo.';
   studyMock = { id:'ai-browser-example', title:'Plantas: ideas centrales', icon:'📚', category:'Ideas clave · IA', summary:'Las plantas transforman energía y absorben recursos del suelo.', keyPoints:[{idea:'Conversión de energía',evidence:text.split('. ')[0]+'.',source:'Apuntes pegados'},{idea:'Absorción de recursos',evidence:text.split('. ')[1],source:'Apuntes pegados'}], questions:[{prompt:'¿Qué transforma la fotosíntesis?',options:['Energía luminosa','Sonido','Rocas'],answer:0,explanation:'Transforma energía luminosa en química.',evidence:text.split('. ')[0]+'.',source:'Apuntes pegados'},{prompt:'¿Qué absorben las raíces?',options:['Luz','Agua y nutrientes','Sonido'],answer:1,explanation:'Absorben agua y nutrientes del suelo.',evidence:text.split('. ')[1],source:'Apuntes pegados'}] };
-  await cdp('Fetch.enable', {patterns:[{urlPattern:'*/api/study'}]});
+  statusMock = { online:true, ai:true, provider:'gemini', model:'test-only-model' };
+  await cdp('Fetch.enable', {patterns:[{urlPattern:'*/api/study'}, {urlPattern:'*/api/status'}]});
   await click('[data-view="study"]'); await click('[data-action="notes"]');
-  // Enable the server feature for this isolated UI contract test only.
-  await evaluate('document.querySelector("#study-mode option[value=ai]").disabled=false; document.querySelector("#study-mode").value="ai"');
+  await waitFor('document.querySelector("#study-mode option[value=ai]")?.disabled === false');
+  await set('#study-mode', 'ai');
   await set('#notes', text); await submit('#notes-form');
   await waitFor('document.querySelector(".analysis-summary") !== null');
   assert.equal(await evaluate('document.querySelectorAll(".key-points article").length'), 2);
@@ -189,8 +221,20 @@ try {
   await click('[data-action="review-game"][data-quiz="ai-browser-example"]');
   assert.equal(await evaluate('document.querySelectorAll(".key-points article").length'), 2);
   assert.equal((await saved()).games.find(g=>g.id==='ai-browser-example').questions[0].options.length, 3);
-  console.log('✓ Interfaz de IA: resumen, ideas, citas, trivia y persistencia (respuesta de servicio controlada; no OpenAI real)');
+  console.log('✓ Interfaz de IA: resumen, ideas, citas, trivia y persistencia (respuesta de servicio controlada; sin llamada real al proveedor)');
+  await click('[data-action="close"]');
+  statusMock = { online:true, ai:false, provider:'gemini', model:'test-only-model' };
+  await cdp('Fetch.enable', {patterns:[{urlPattern:'*/api/status'}]});
+  await click('[data-action="notes"]');
+  await waitFor('document.querySelector("[data-action=retry-service]")?.disabled === false && document.querySelector("#study-mode option[value=ai]")?.disabled === true');
+  await set('#notes', text); statusMock.ai = true;
+  await click('[data-action="retry-service"]');
+  await waitFor('document.querySelector("[data-action=retry-service]")?.disabled === false && document.querySelector("#study-mode option[value=ai]")?.disabled === false');
+  assert.equal(await evaluate('document.querySelector("#notes").value'), text);
+  assert.equal(await evaluate('document.querySelector("#ai-provider-name").textContent'), 'Google Gemini');
+  await click('[data-action="close"]'); await cdp('Fetch.disable');
+  console.log('✓ Recuperación del servicio de IA: actualizar disponibilidad sin reiniciar ni perder los apuntes');
   assert.deepEqual(errors, [], 'Errores de navegador');
   console.log('✓ Sin excepciones JavaScript ni errores de recursos');
   console.log(`Capturas en ${out}`);
-} finally { socket?.close(); chrome.kill('SIGTERM'); await once(chrome, 'exit').catch(() => {}); await rm(profile, { recursive: true, force: true }); }
+} finally { socket?.close(); chrome.kill('SIGTERM'); await once(chrome, 'exit').catch(() => {}); await rm(profile, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 }); }

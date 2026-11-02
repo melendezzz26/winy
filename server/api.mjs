@@ -29,7 +29,10 @@ export function createApi({ dbPath = process.env.WINY_DB || path.resolve('.local
   async function body(req) {
     const chunks = []; let size = 0;
     for await (const chunk of req) { size += chunk.length; if (size > 512000) fail(413, 'El contenido es demasiado grande. Usa un fragmento de tu clase.'); chunks.push(chunk); }
-    try { return JSON.parse(Buffer.concat(chunks).toString('utf8') || '{}'); } catch { fail(400, 'Datos de solicitud no válidos.'); }
+    let input;
+    try { input = JSON.parse(Buffer.concat(chunks).toString('utf8') || '{}'); } catch { fail(400, 'Datos de solicitud no válidos.'); }
+    if (!input || typeof input !== 'object' || Array.isArray(input)) fail(400, 'Datos de solicitud no válidos.');
+    return input;
   }
   async function handle(req, res) {
     const origin = req.headers.origin;
@@ -62,7 +65,7 @@ export function createApi({ dbPath = process.env.WINY_DB || path.resolve('.local
       if (req.method === 'POST' && pathname === '/api/study') {
         if (!ai.enabled) fail(503, 'El análisis con IA aún no está activado en el servidor.');
         const input = await body(req);
-        if (!Array.isArray(input.sources) || !input.sources.length || input.sources.length > 120) fail(400, 'Agrega el contenido de tu clase.');
+        if (!Array.isArray(input.sources) || !input.sources.length || input.sources.length > 401 || input.sources.some(s => !s || typeof s !== 'object' || Array.isArray(s) || typeof s.text !== 'string')) fail(400, 'Agrega fuentes de texto válidas para tu clase.');
         const sources = input.sources.map(s => ({ name: String(s.name || 'Apuntes').slice(0, 180), text: typeof s.text === 'string' ? s.text.trim() : '' })).filter(s => s.text);
         const length = sources.reduce((n, s) => n + s.text.length, 0);
         if (length < 200) fail(400, 'Agrega varios párrafos explicativos. El título solo no es suficiente.');

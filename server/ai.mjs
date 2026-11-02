@@ -44,22 +44,25 @@ async function providerFailure(response) {
   return new AIServiceError('El proveedor de IA no está disponible en este momento. Inténtalo más tarde.', 502, 'ai_provider_unavailable');
 }
 export function validateAnalysis(result, sources) {
+  if (!result || typeof result !== 'object' || Array.isArray(result)) throw new Error('La IA devolvió un análisis incompleto. Inténtalo de nuevo.');
   if (result.insufficient_material) throw new Error('El material no contiene suficientes ideas explicadas para crear una trivia. Agrega el contenido de la clase.');
   if (typeof result.summary !== 'string' || !result.summary.trim() || !Array.isArray(result.key_points) || result.key_points.length < 2 || !Array.isArray(result.questions) || result.questions.length < 2 || result.questions.length > 8) throw new Error('La IA devolvió un análisis incompleto. Inténtalo de nuevo.');
   function evidence(item) {
     const source = sources[item.source_id];
-    if (!source || typeof item.quote !== 'string' || item.quote.trim().length < 15 || !compact(source.text).includes(compact(item.quote))) throw new Error('No pudimos verificar una cita del análisis. No se guardaron preguntas sin respaldo.');
+    if (!Number.isInteger(item.source_id) || !source || typeof item.quote !== 'string' || item.quote.trim().length < 15 || item.quote.length > 350 || !compact(source.text).includes(compact(item.quote))) throw new Error('No pudimos verificar una cita del análisis. No se guardaron preguntas sin respaldo.');
     return { evidence: item.quote.trim(), source: source.name };
   }
   const keyPoints = result.key_points.slice(0, 8).map(p => {
-    if (typeof p.idea !== 'string' || !p.idea.trim()) throw new Error('El análisis no contiene una idea válida.');
+    if (!p || typeof p !== 'object' || typeof p.idea !== 'string' || !p.idea.trim()) throw new Error('El análisis no contiene una idea válida.');
     return { idea: p.idea.trim(), ...evidence(p) };
   });
   const questions = result.questions.map(q => {
-    if (typeof q.prompt !== 'string' || !q.prompt.trim() || !Array.isArray(q.options) || q.options.length !== 3 || q.options.some(o => typeof o !== 'string' || !o.trim()) || new Set(q.options.map(o => compact(o).toLowerCase())).size !== 3 || !Number.isInteger(q.answer) || q.answer < 0 || q.answer > 2 || typeof q.explanation !== 'string') throw new Error('La IA devolvió una pregunta no válida. Inténtalo de nuevo.');
+    if (!q || typeof q !== 'object' || typeof q.prompt !== 'string' || !q.prompt.trim() || !Array.isArray(q.options) || q.options.length !== 3 || q.options.some(o => typeof o !== 'string' || !o.trim()) || new Set(q.options.map(o => compact(o).toLowerCase())).size !== 3 || !Number.isInteger(q.answer) || q.answer < 0 || q.answer > 2 || typeof q.explanation !== 'string' || !q.explanation.trim()) throw new Error('La IA devolvió una pregunta no válida. Inténtalo de nuevo.');
     return { prompt: q.prompt.trim(), options: q.options.map(o => o.trim()), answer: q.answer, explanation: q.explanation.trim(), ...evidence(q) };
   });
-  return { id: `ai-${randomUUID()}`, title: String(result.title || 'Mi clase').slice(0, 100), icon: '📚', category: 'Ideas clave · IA', summary: result.summary.trim(), keyPoints, questions };
+  const distinct = [...new Map(questions.map(q => [compact(q.prompt).toLowerCase(), q])).values()];
+  if (distinct.length < 2) throw new Error('La IA repitió las preguntas. Inténtalo con otro fragmento de tu clase.');
+  return { id: `ai-${randomUUID()}`, title: String(result.title || 'Mi clase').slice(0, 100), icon: '📚', category: 'Ideas clave · IA', summary: result.summary.trim(), keyPoints, questions: distinct };
 }
 
 export function createAI(options = {}) {

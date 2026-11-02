@@ -2,7 +2,7 @@
 
 El proyecto `android/` empaqueta el juego disponible en `web/` dentro de un WebView. Incluye las mascotas originales, fuentes y lectores de documentos. Los modos locales funcionan sin servidor; la IA y las salas entre teléfonos requieren el servidor HTTPS configurado. Consulta [cómo activar esos servicios](ia-y-salas.md).
 
-El APK 0.2.1 de esta rama apunta a `https://winy.onrender.com`. El proveedor se selecciona en Render; admite OpenAI y Google Gemini sin incluir sus claves en el APK.
+El APK 0.3.0 de esta rama apunta a `https://winy.onrender.com`. El proveedor se selecciona en Render; admite OpenAI y Google Gemini sin incluir sus claves en el APK. Si encuentra `GEMINI_API_KEY` y no hay un proveedor explícito, selecciona Gemini.
 
 ## Instalar el APK de prueba
 
@@ -17,10 +17,11 @@ El progreso se guarda en el almacenamiento privado de la aplicación. Se mantien
 ## Recorrido de prueba en el teléfono
 
 - Elegir y nombrar las cuatro mascotas; cambiar de compañero conservando monedas, nivel y accesorios.
-- Completar una trivia, revisar explicaciones y comprobar que repetirla el mismo día no duplica recompensas.
+- Tocar a la mascota para ver sus respuestas y animación. No debe cambiar el saldo.
+- Completar una trivia, revisar explicaciones y comprobar que mejorar la marca entrega la diferencia de recompensas; repetirla con igual puntuación no paga otra vez.
 - Completar los hábitos de comida y pausa. Iniciar el temporizador de 30 segundos, cambiar de sección o cerrar y volver a abrir la aplicación, y revisar el hábito de enfoque.
 - Cargar TXT, Markdown, PDF con texto, DOCX y PPTX desde el selector nativo; revisar la evidencia de los ejercicios. Un escaneo o un documento con contraseña debe mostrar un error legible.
-- Elegir destinos en el mapa y abrir sus retos.
+- Elegir los seis destinos en el mapa y abrir sus retos propios. Conseguir dos de tres aciertos para ganar un sello; volver al Hogar o reiniciar para comprobar el pasaporte guardado.
 - Con el servidor configurado, crear una sala y entrar con el código desde otro teléfono; comprobar inicio, cuatro rondas y resultado. Probar también el dúo en un mismo teléfono.
 - Comprar y equipar accesorios, comprobar saldo insuficiente y volver a abrir la app para revisar el guardado.
 - Abrir un modal y pulsar Atrás: debe cerrarse. Desde una sección, Atrás vuelve al Hogar; desde Hogar sale de la aplicación.
