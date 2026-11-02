@@ -9,6 +9,7 @@ import { MISSIONS, completeDestination, companionMessage } from './core/gameplay
 import { createStudyFlow } from './core/study-flow.js';
 import { recordReview, reviewQuestions, reviewCount } from './core/review.js';
 import { providerLabel } from './core/providers.js';
+import { createPomodoro } from './core/pomodoro-ui.js';
 
 const app = document.querySelector('#app');
 const dialog = document.querySelector('#dialog');
@@ -75,7 +76,7 @@ function home() {
 }
 function quizCard(q, custom = false) { return `<button class="card quiz-card" data-action="${custom ? 'review-game' : 'quiz'}" data-quiz="${esc(q.id)}"><span class="tile-icon">${esc(q.icon || '📚')}</span><span><strong>${esc(q.title)}</strong><small>${q.questions.length} preguntas · ${esc(q.category)}</small><span class="tag">Jugar + XP</span></span>${icon('arrow')}</button>`; }
 function study() {
-  return `${heading('Aprende a tu manera', 'De apuntes a aventura.', 'Tú pones el tema. Tu compañero va contigo.')}<section class="study-hero"><span class="tag">Tu rincón de estudio</span><h2>¿Qué quieres<br>descubrir hoy?</h2><p>Trae tus apuntes y elige<br>ideas clave con trivia o<br>completar palabras.</p>${pet(state.pet, state.equipped)}</section>${button(`${icon('upload')} Crear juego con mis archivos`, 'notes')}<div class="section-title"><h2>Listos para jugar</h2><span class="tag">Solo o en dúo</span></div>${reviewCount(state) ? button(`Repasar ${reviewCount(state)} conceptos pendientes ${icon('arrow')}`, 'review-due', '', 'secondary full') : ''}<div class="quiz-list">${Object.values(QUIZZES).map(q => quizCard(q)).join('')}${state.games.map(q => quizCard(q, true)).join('')}</div><button class="focus-card" data-action="focus"><span class="tile-icon">◷</span><span><strong>Modo enfoque</strong><small>Una tarea pequeña. Un momento para ti.</small></span>${icon('arrow')}</button>`;
+  return `${heading('Aprende a tu manera', 'De apuntes a aventura.', 'Tú pones el tema. Tu compañero va contigo.')}<section class="study-hero"><span class="tag">Tu rincón de estudio</span><h2>¿Qué quieres<br>descubrir hoy?</h2><p>Trae tus apuntes y elige<br>ideas clave con trivia o<br>completar palabras.</p>${pet(state.pet, state.equipped)}</section>${button(`${icon('upload')} Crear juego con mis archivos`, 'notes')}${learningProgress()}<div class="section-title"><h2>Listos para jugar</h2><span class="tag">Solo o en dúo</span></div>${reviewCount(state) ? button(`Repasar ${reviewCount(state)} conceptos pendientes ${icon('arrow')}`, 'review-due', '', 'secondary full') : ''}<div class="quiz-list">${Object.values(QUIZZES).map(q => quizCard(q)).join('')}${state.games.map(q => quizCard(q, true)).join('')}</div><button class="focus-card" data-action="focus"><span class="tile-icon">◷</span><span><strong>Mi Pomodoro</strong><small>Una meta · estudio · descanso · repaso</small></span>${icon('arrow')}</button>`;
 }
 function map() { return peruMap(destination, state.passport); }
 function adventure() {
@@ -91,7 +92,7 @@ function style() {
 function render() {
   app.classList.toggle('welcome', !state.onboarded);
   if (!state.onboarded) { app.innerHTML = onboarding(); return; }
-  app.innerHTML = `${header()}<main id="content" class="page">${({ home, study, adventure, friends, style })[view]()}</main>${nav()}`;
+  app.innerHTML = `${header()}<main id="content" class="page">${({ home, study, adventure, friends, style })[view]()}</main>${pomodoro.bar()}${nav()}`;
 }
 function openModal(title, body, type = 'info') {
   modal = type;
@@ -125,36 +126,43 @@ function refreshService() {
 }
 function showAnalysis(game) {
   const errors = reviewQuestions(state, game, { errorsOnly: true }).length, q = game.questions[0];
-  openModal(game.title, `<span class="tag">Tu repaso está listo · ${game.questions.length} conceptos</span>${game.provider ? `<p class="small muted">Preparado con ${providerLabel(game.provider)}</p>` : ''}${game.providerCoverage?.sampled ? `<p class="notice">Se analizaron extractos: ${Number(game.providerCoverage.selected).toLocaleString('es-PE')} de ${Number(game.providerCoverage.total).toLocaleString('es-PE')} caracteres preparados.</p>` : ''}${game.quality?.omittedQuestions || game.quality?.omittedKeyPoints ? '<p class="notice">Se descartaron partes sin citas verificables. Este repaso conserva únicamente las preguntas e ideas con respaldo en tus apuntes.</p>' : ''}${game.summary ? `<p class="analysis-summary">${esc(game.summary)}</p>` : '<p class="analysis-summary">Ejercicios locales para completar palabras de tus apuntes. Elige cómo practicar.</p>'}<div class="game-picker">${[['trivia', q.expected ? '✍️ Completar palabras' : '🎯 Trivia de comprensión', 'Responde y recibe una explicación.'], ['cards', '🃏 Tarjetas de memoria', 'Recuerda antes de descubrir la respuesta.'], ['mixed', '🧭 Repaso mixto', 'Alterna preguntas y tarjetas.']].map(([format, label, description]) => `<button class="game-option ${game.playMode === format ? 'recommended' : ''}" data-action="custom-quiz" data-quiz="${esc(game.id)}" data-format="${format}"><strong>${label}</strong><small>${description}</small></button>`).join('')}</div><details class="game-example"><summary>Ver una pregunta de ejemplo</summary><p>${esc(q.prompt)}</p>${q.options ? `<ul>${q.options.map(o => `<li>${esc(o)}</li>`).join('')}</ul>` : '<p class="small muted">Completarás la palabra que falta.</p>'}</details>${errors ? button(`Repasar mis errores (${errors})`, 'review-errors', `data-quiz="${esc(game.id)}"`, 'secondary full') : ''}<p class="notice">Tus respuestas guardan qué necesitas practicar. Los aciertos vuelven en 1, 3, 7 y 14 días; los errores puedes repasarlos ahora.</p><div class="key-points">${(Array.isArray(game.keyPoints) ? game.keyPoints : []).map(p => `<article><h3>${esc(p.idea)}</h3><blockquote>${esc(p.evidence)}<cite>${esc(p.source)}</cite></blockquote></article>`).join('')}</div>`, 'analysis');
+  openModal(game.title, `<span class="tag">Tu repaso está listo · ${game.questions.length} conceptos</span>${game.provider ? `<p class="small muted">Preparado con ${providerLabel(game.provider)}</p>` : ''}${game.providerCoverage?.sampled ? `<p class="notice">Se analizaron extractos: ${Number(game.providerCoverage.selected).toLocaleString('es-PE')} de ${Number(game.providerCoverage.total).toLocaleString('es-PE')} caracteres preparados.</p>` : ''}${game.quality?.omittedQuestions || game.quality?.omittedKeyPoints ? '<p class="notice">Se descartaron partes sin citas verificables. Este repaso conserva únicamente las preguntas e ideas con respaldo en tus apuntes.</p>' : ''}${game.summary ? `<p class="analysis-summary">${esc(game.summary)}</p>` : '<p class="analysis-summary">Ejercicios locales para completar palabras de tus apuntes. Elige cómo practicar.</p>'}<div class="game-picker">${[['trivia', q.expected ? '✍️ Completar palabras' : '🎯 Trivia de comprensión', 'Responde y recibe una explicación.'], ['cards', '🃏 Tarjetas de memoria', 'Recuerda antes de descubrir la respuesta.'], ['mixed', '🧭 Repaso mixto', 'Alterna preguntas y tarjetas.'], ['explain', '💬 Con mis palabras', 'Explica antes de comparar con tus apuntes.']].map(([format, label, description]) => `<button class="game-option ${game.playMode === format ? 'recommended' : ''}" data-action="custom-quiz" data-quiz="${esc(game.id)}" data-format="${format}"><strong>${label}</strong><small>${description}</small></button>`).join('')}</div><details class="game-example"><summary>Ver una pregunta de ejemplo</summary><p>${esc(q.prompt)}</p>${q.options ? `<ul>${q.options.map(o => `<li>${esc(o)}</li>`).join('')}</ul>` : '<p class="small muted">Completarás la palabra que falta.</p>'}</details>${errors ? button(`Repasar errores y dudas (${errors})`, 'review-errors', `data-quiz="${esc(game.id)}"`, 'secondary full') : ''}<p class="notice">Los aciertos seguros vuelven en 1, 3, 7 y 14 días. Los aciertos con dudas, en 10 minutos; errores y dudas también pueden repasarse ahora.</p>${button('Preparar mi Pomodoro con este tema', 'focus', `data-quiz="${esc(game.id)}"`, 'secondary full')}<div class="key-points">${(Array.isArray(game.keyPoints) ? game.keyPoints : []).map(p => `<article><h3>${esc(p.idea)}</h3><blockquote>${esc(p.evidence)}<cite>${esc(p.source)}</cite></blockquote></article>`).join('')}</div>`, 'analysis');
 }
 function startQuiz(game, players = null, missionId = null, options = {}) {
-  quiz = { game, missionId, questions: options.questions || (players ? game.questions.slice(0, 4) : game.questions), format: options.format || 'trivia', review: Boolean(options.review), index: 0, score: 0, scores: [0, 0], players, answered: false, result: null };
+  quiz = { game, missionId, questions: options.questions || (players ? game.questions.slice(0, 4) : game.questions), format: options.format || 'trivia', review: Boolean(options.review), index: 0, score: 0, uncertain: 0, selfRated: 0, scores: [0, 0], players, answered: false, result: null };
   showQuestion();
 }
 function showQuestion() {
   const q = quiz.questions[quiz.index], custom = !!q.expected;
+  if (!quiz.players && quiz.format === 'explain') { showExplanation(q); return; }
   if (!quiz.players && (quiz.format === 'cards' || quiz.format === 'mixed' && quiz.index % 2 === 1)) { showCard(q); return; }
-  openModal(quiz.players ? 'Trivia en dúo' : quiz.game.title, `<div class="quiz-meta"><span class="tag">${quiz.players ? 'Turno de ' + esc(quiz.players[quiz.index % 2]) : 'Reto ' + (quiz.index + 1)}</span><span>${quiz.index + 1} / ${quiz.questions.length}</span></div><progress class="xp" value="${quiz.index}" max="${quiz.questions.length}" aria-label="Preguntas completadas"></progress><h3 class="question">${esc(q.prompt)}</h3><p class="small muted">${custom ? 'Completa la palabra que falta en tus apuntes.' : 'Toca la respuesta que creas correcta.'}</p>${custom ? '<form id="answer-form"><label for="study-answer">Tu respuesta</label><input id="study-answer" name="answer" required maxlength="100" autocomplete="off"><button type="submit" class="primary">Comprobar</button></form>' : `<div class="answers">${q.options.map((o, i) => `<button class="answer" data-action="answer" data-answer="${i}"><span>${'ABC'[i]}</span>${esc(o)}</button>`).join('')}</div>`}<div id="feedback" aria-live="polite"></div>${quiz.players ? `<div class="duo-scores"><span>${esc(quiz.players[0])}: ${quiz.scores[0]}</span><span>${esc(quiz.players[1])}: ${quiz.scores[1]}</span></div>` : ''}`, 'quiz');
+  const tracked = !quiz.players && state.games.some(g => g.id === quiz.game.id);
+  openModal(quiz.players ? 'Trivia en dúo' : quiz.game.title, `<div class="quiz-meta"><span class="tag">${quiz.players ? 'Turno de ' + esc(quiz.players[quiz.index % 2]) : 'Reto ' + (quiz.index + 1)}</span><span>${quiz.index + 1} / ${quiz.questions.length}</span></div><progress class="xp" value="${quiz.index}" max="${quiz.questions.length}" aria-label="Preguntas completadas"></progress>${skillLabel(q)}<h3 class="question">${esc(q.prompt)}</h3><p class="small muted">${custom ? 'Completa la palabra que falta en tus apuntes.' : 'Piensa una respuesta antes de mirar las alternativas.'}</p>${tracked ? '<fieldset class="confidence"><legend>Antes de responder, ¿cómo te sientes?</legend><label><input type="radio" name="confidence" value="sure"> Seguro de mi respuesta</label><label><input type="radio" name="confidence" value="unsure" checked> Tengo dudas</label></fieldset>' : ''}${custom ? '<form id="answer-form"><label for="study-answer">Tu respuesta</label><input id="study-answer" name="answer" required maxlength="100" autocomplete="off"><button type="submit" class="primary">Comprobar</button></form>' : `<div class="answers">${q.options.map((o, i) => `<button class="answer" data-action="answer" data-answer="${i}"><span>${'ABC'[i]}</span>${esc(o)}</button>`).join('')}</div>`}<div id="feedback" aria-live="polite"></div>${quiz.players ? `<div class="duo-scores"><span>${esc(quiz.players[0])}: ${quiz.scores[0]}</span><span>${esc(quiz.players[1])}: ${quiz.scores[1]}</span></div>` : ''}`, 'quiz');
 }
+function skillLabel(q) { return q.skill ? `<p class="small learning-skill">${esc(({ recall: 'Recordar una idea', understand: 'Comprender una relación', apply: 'Aplicar lo aprendido' })[q.skill] || 'Practicar una idea')}</p>` : ''; }
 function answerQuiz(answer) {
   if (!quiz || quiz.answered || modal !== 'quiz') return;
   quiz.answered = true;
   const q = quiz.questions[quiz.index];
   const correct = q.expected ? checkStudyAnswer(answer, q.expected) : Number(answer) === q.answer;
-  if (state.games.some(g => g.id === quiz.game.id)) { recordReview(state, quiz.game, q, correct); save(); }
+  const confidence = dialog.querySelector('input[name=confidence]:checked')?.value || 'sure';
+  if (correct && confidence === 'unsure') quiz.uncertain++;
+  if (state.games.some(g => g.id === quiz.game.id)) { recordReview(state, quiz.game, q, correct, Date.now(), confidence); save(); }
   if (correct) { quiz.score++; quiz.scores[quiz.index % 2]++; }
   dialog.querySelectorAll('.answer').forEach((el, i) => {
     el.disabled = true;
     if (i === q.answer) el.classList.add('correct');
     else if (i === Number(answer)) el.classList.add('incorrect');
   });
+  dialog.querySelectorAll('input[name=confidence]').forEach(el => el.disabled = true);
   const answerForm = dialog.querySelector('#answer-form');
   if (answerForm) answerForm.querySelectorAll('input, button').forEach(el => el.disabled = true);
   const feedback = document.querySelector('#feedback');
-  feedback.innerHTML = `<div class="feedback ${correct ? 'success' : 'try-again'}"><strong>${correct ? '¡Así es! Un poquito más de sabiduría.' : '¡Seguimos aprendiendo!'}</strong>${q.expected ? `<p>La palabra es <b>${esc(q.expected)}</b>.</p><blockquote>${esc(q.evidence)}<cite>${esc(q.source)}</cite></blockquote>` : `<p>${esc(q.explanation)}</p>${q.evidence ? `<blockquote>${esc(q.evidence)}<cite>${esc(q.source)}</cite></blockquote>` : ''}`}</div>${button(quiz.index + 1 === quiz.questions.length ? 'Ver mi resultado' : quiz.players ? 'Pasar al siguiente jugador ' + icon('arrow') : 'Siguiente reto ' + icon('arrow'), 'next-question')}`;
+  feedback.innerHTML = `<div class="feedback ${correct ? 'success' : 'try-again'}"><strong>${correct ? confidence === 'unsure' ? 'Acertaste con dudas. Vamos a reforzarlo.' : '¡Así es! Ahora conecta la idea.' : 'Aquí hay una oportunidad para aprender.'}</strong>${q.expected ? `<p>La palabra es <b>${esc(q.expected)}</b>.</p><blockquote>${esc(q.evidence)}<cite>${esc(q.source)}</cite></blockquote>` : `<p>${esc(q.explanation)}</p>${q.evidence ? `<blockquote>${esc(q.evidence)}<cite>${esc(q.source)}</cite></blockquote>` : ''}`}<p class="small">${correct ? '¿Cómo se lo explicarías a un compañero sin repetir la frase?' : '¿Qué detalle distingue tu respuesta de la correcta? Busca ese detalle en la explicación.'}</p></div>${nextQuestionButton()}`;
   feedback.querySelector('button').focus();
   feedback.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
 }
+function nextQuestionButton() { return button(quiz.index + 1 === quiz.questions.length ? 'Ver mi resultado' : quiz.players ? 'Pasar al siguiente jugador ' + icon('arrow') : 'Siguiente concepto ' + icon('arrow'), 'next-question'); }
 function endQuiz() {
   const rewardScore = quiz.players ? quiz.scores[0] : quiz.score;
   quiz.result = quiz.review ? { xp: 0, coins: 0, claimed: false } : finishQuiz(state, (quiz.players ? 'duo-' : '') + quiz.game.id, rewardScore, quiz.questions.length);
@@ -163,23 +171,34 @@ function endQuiz() {
   let result = '¡Tu aventura sigue creciendo!';
   if (quiz.players) result = quiz.scores[0] === quiz.scores[1] ? '¡Un gran empate!' : `¡Ganó ${quiz.players[quiz.scores[0] > quiz.scores[1] ? 0 : 1]}!`;
   const stampMessage = stamp ? `<p class="stamp-result">${stamp.earned ? '✦ ¡Nuevo sello para tu pasaporte!' : stamp.already ? '✓ Este destino ya forma parte de tu pasaporte.' : `Con ${stamp.required} aciertos consigues este sello. ¡Puedes intentarlo otra vez!`}</p>` : '';
-  const errors = state.games.some(g => g.id === quiz.game.id) ? reviewQuestions(state, quiz.game, { errorsOnly: true }).length : 0;
-  openModal('Pequeños pasos, grandes logros', `<div class="result"><span class="result-star" aria-hidden="true">✦</span><h3>${esc(result)}</h3><p>${quiz.score} de ${quiz.questions.length} respuestas correctas</p>${stampMessage}${quiz.players ? `<div class="scoreboard">${quiz.players.map((p, i) => `<div><strong>${esc(p)}</strong><span>${quiz.scores[i]} puntos</span></div>`).join('')}</div>` : ''}<div class="reward-pills"><span class="pill">+${quiz.result.xp} XP</span><span class="pill coins">🪙 +${quiz.result.coins}</span></div><p class="small muted">${quiz.review ? 'Repaso guardado. Los errores siguen pendientes y los aciertos volverán más adelante. Este repaso no duplica premios.' : quiz.result.claimed ? 'Tu mejor marca de hoy está guardada. Mejora tus aciertos para ganar la diferencia de XP y monedas.' : quiz.players ? 'Las recompensas de tu jugador se guardan en este dispositivo.' : '¡Lo que aprendes hoy te acompaña mañana!'}</p>${errors ? button(`Repasar mis errores (${errors})`, 'review-errors', `data-quiz="${esc(quiz.game.id)}"`, 'secondary full') : ''}${button('Seguir mi aventura', 'close')}${button('Volver a jugar', 'replay', '', 'secondary full')}</div>`, 'result');
+  const tracked = state.games.some(g => g.id === quiz.game.id), errors = tracked ? reviewQuestions(state, quiz.game, { errorsOnly: true }).length : 0;
+  const outcome = quiz.selfRated ? `${quiz.score} de ${quiz.questions.length} conceptos marcados como recordados o resueltos. Incluye ${quiz.selfRated} autoevaluaciones; no es una nota automática.` : `${quiz.score} de ${quiz.questions.length} respuestas correctas`;
+  openModal('Pequeños pasos, grandes logros', `<div class="result"><span class="result-star" aria-hidden="true">✦</span><h3>${esc(result)}</h3><p>${outcome}</p>${quiz.uncertain ? `<p class="notice">${quiz.uncertain} aciertos con dudas: volverán a aparecer pronto para reforzarlos.</p>` : ''}${stampMessage}${quiz.players ? `<div class="scoreboard">${quiz.players.map((p, i) => `<div><strong>${esc(p)}</strong><span>${quiz.scores[i]} puntos</span></div>`).join('')}</div>` : ''}<div class="reward-pills"><span class="pill">+${quiz.result.xp} XP</span><span class="pill coins">🪙 +${quiz.result.coins}</span></div><p class="small muted">${quiz.review ? 'Repaso guardado. Errores y dudas siguen pendientes; los aciertos seguros volverán más adelante. Este repaso no duplica premios.' : quiz.result.claimed ? 'Tu mejor marca de hoy está guardada. Mejora tus aciertos para ganar la diferencia de XP y monedas.' : quiz.players ? 'Las recompensas de tu jugador se guardan en este dispositivo.' : 'Puedes parar aquí. Volver otro día también ayuda a recordar.'}</p>${errors ? button(`Repasar errores y dudas (${errors})`, 'review-errors', `data-quiz="${esc(quiz.game.id)}"`, 'secondary full') : ''}${tracked ? button('Preparar mi Pomodoro con este tema', 'focus', `data-quiz="${esc(quiz.game.id)}"`, 'secondary full') : ''}${button('Seguir mi aventura', 'close')}${button('Volver a jugar', 'replay', '', 'secondary full')}</div>`, 'result');
 }
+function answerBack(q) { return `<h3>${esc(q.expected || q.options[q.answer])}</h3><p>${esc(q.explanation || 'Esta palabra completa la frase de tus apuntes.')}</p><blockquote>${esc(q.evidence)}<cite>${esc(q.source)}</cite></blockquote>`; }
 function showCard(q) {
-  openModal(quiz.game.title, `<div class="quiz-meta"><span class="tag">${quiz.review ? 'Repaso' : 'Tarjeta de memoria'}</span><span>${quiz.index + 1} / ${quiz.questions.length}</span></div><article class="memory-card"><span class="big-emoji" aria-hidden="true">🃏</span><h3 class="question">${esc(q.prompt)}</h3><p class="small muted">Piensa tu respuesta antes de descubrirla.</p>${button('Mostrar respuesta', 'card-flip')}<div class="review-back" hidden><h3>${esc(q.expected || q.options[q.answer])}</h3><p>${esc(q.explanation || 'Esta palabra completa la frase de tus apuntes.')}</p><blockquote>${esc(q.evidence)}<cite>${esc(q.source)}</cite></blockquote></div><div class="card-ratings" hidden><p>¿Lo recordaste sin mirar?</p>${button('Sí, lo recordé', 'card-rate', 'data-correct="true"')}${button('Necesito practicar', 'card-rate', 'data-correct="false"', 'secondary full')}</div></article><div id="feedback" aria-live="polite"></div>`, 'quiz');
+  openModal(quiz.game.title, `<div class="quiz-meta"><span class="tag">${quiz.review ? 'Repaso' : 'Tarjeta de memoria'}</span><span>${quiz.index + 1} / ${quiz.questions.length}</span></div><article class="memory-card"><span class="big-emoji" aria-hidden="true">🃏</span><h3 class="question">${esc(q.prompt)}</h3><p class="small muted">Di tu respuesta antes de descubrirla. Después compárala con tus apuntes.</p>${button('Mostrar respuesta', 'card-flip')}<div class="review-back" hidden>${answerBack(q)}</div><div class="card-ratings" hidden><p>¿Lo recordaste sin mirar?</p>${button('Sí, lo recordé', 'card-rate', 'data-correct="true"')}${button('Necesito practicar', 'card-rate', 'data-correct="false"', 'secondary full')}</div></article><div id="feedback" aria-live="polite"></div>`, 'quiz');
+}
+function showExplanation(q) {
+  openModal(quiz.game.title, `<div class="quiz-meta"><span class="tag">Con mis palabras</span><span>${quiz.index + 1} / ${quiz.questions.length}</span></div><article class="memory-card">${skillLabel(q)}<h3 class="question">${esc(q.prompt)}</h3><p class="small muted">Responde como si se lo explicaras a un compañero. Añade un «porque» o una relación cuando tenga sentido.</p><form id="explain-form"><label for="own-explanation">Mi explicación, sin mirar los apuntes</label><textarea id="own-explanation" required minlength="12" maxlength="1200" rows="4" placeholder="Lo entiendo así…"></textarea><p class="small muted">Se usa solo en esta pantalla; no se envía a la IA ni se guarda.</p><button class="primary" type="submit">Comparar con mis apuntes</button></form><div class="review-back" hidden>${answerBack(q)}<fieldset class="explain-rubric"><legend>Compara tu explicación</legend><label><input type="checkbox"> Respondí lo que se pregunta.</label><label><input type="checkbox"> Expliqué la idea o su relación con claridad.</label><label><input type="checkbox"> Coincide con lo que respaldan los apuntes.</label></fieldset><p class="small muted">La comparación es tuya. Winy no califica automáticamente este texto.</p></div><div class="card-ratings" hidden>${button('Pude explicarlo', 'card-rate', 'data-correct="true"')}${button('Me faltó una idea', 'card-rate', 'data-correct="false"', 'secondary full')}</div></article><div id="feedback" aria-live="polite"></div>`, 'quiz');
 }
 function rateCard(correct) {
   if (!quiz || quiz.answered || modal !== 'quiz' || dialog.querySelector('.review-back')?.hidden) return;
-  quiz.answered = true; if (correct) quiz.score++;
+  if (correct && quiz.format === 'explain' && dialog.querySelectorAll('.explain-rubric input:checked').length !== 3) { toast('Compara los tres puntos antes de marcar que pudiste explicarlo.'); return; }
+  quiz.answered = true; quiz.selfRated++; if (correct) quiz.score++;
   recordReview(state, quiz.game, quiz.questions[quiz.index], correct); save();
-  dialog.querySelectorAll('[data-action=card-rate]').forEach(b => { b.disabled = true; });
-  dialog.querySelector('#feedback').innerHTML = `<p class="notice">${correct ? 'Guardado. Volverás a practicar este concepto más adelante.' : 'Lo guardamos para repasar. Puedes intentarlo otra vez al terminar.'}</p>${button(quiz.index + 1 === quiz.questions.length ? 'Ver mi resultado' : 'Siguiente concepto', 'next-question')}`;
+  dialog.querySelectorAll('[data-action=card-rate], .explain-rubric input').forEach(b => { b.disabled = true; });
+  dialog.querySelector('#feedback').innerHTML = `<p class="notice">${correct ? 'Autoevaluación guardada. Vuelve otro día para comprobar qué recuerdas.' : 'Identificaste una idea que falta. Puedes repasarla al terminar.'}</p>${nextQuestionButton()}`;
+}
+function learningProgress() {
+  const sessions = state.studySessions.filter(s => today(new Date(s.endedAt)) === today()), minutes = sessions.reduce((n, s) => n + s.minutes, 0);
+  const last = state.studySessions.at(-1);
+  return `<section class="learning-progress"><h2>Mi estudio de hoy</h2><div class="learning-metrics"><span><strong>${sessions.length}</strong> bloques</span><span><strong>${minutes}</strong> min registrados</span><span><strong>${reviewCount(state)}</strong> conceptos por repasar</span></div><p class="small muted">El tiempo y los XP registran tu actividad. Comprueba lo aprendido intentando explicarlo sin mirar.</p>${last ? `<p class="small">Última meta: ${esc(last.goal)} · ${last.outcome === 'achieved' ? 'La pude explicar' : last.outcome === 'partial' ? 'Quiero reforzarla' : 'Autoevaluación pendiente'}</p>` : ''}${button('Elegir mi meta y empezar Pomodoro', 'focus', '', 'secondary full')}</section>`;
 }
 function showTutorial() {
   const steps = [
     ['🌱', 'Tu compañero va contigo', 'Tócalo en el Hogar para saludarlo. Completa pequeños hábitos y retos para ganar monedas y elegir su estilo.'],
-    ['🃏', 'Tus apuntes se vuelven un juego', 'Revisa el texto de tu archivo y elige trivia, tarjetas o un repaso mixto. Después podrás volver a practicar tus errores.'],
+    ['🃏', 'Tus apuntes se vuelven un juego', 'Revisa tus apuntes y elige trivia, tarjetas, mixto o explicar con tus palabras. En Estudiar prepara un Pomodoro con meta, descanso y repaso.'],
     ['🧭', 'Llena tu pasaporte', 'Explora los seis destinos del Perú. Dos aciertos de tres te dan un sello que queda guardado.'],
     ['⚔️', 'Comparte una aventura', 'Crea una sala en Amigos y pasa el código a otra persona. Cada uno responde desde su teléfono.']
   ];
@@ -211,27 +230,8 @@ function showHabit(id) {
   const food = id === 'food';
   openModal(food ? 'Dale color a tu plato' : 'Una pausa para ti', `<div class="habit-detail"><span class="big-emoji" aria-hidden="true">${food ? '🥑' : '🌿'}</span><h3>${food ? 'Un sabor de nuestra tierra' : 'Respira. Estira. Sigue.'}</h3><p>${food ? 'La palta, la quinua y la granadilla son parte de la riqueza de nuestros alimentos. Hoy puedes conocer o probar un alimento peruano y sumar variedad a tu plato.' : 'Deja las pantallas un momento, mueve suavemente los hombros y estira las piernas. Haz una pausa a tu ritmo.'}</p><p class="muted small">Cuando lo hayas hecho, registra tu pequeña victoria.</p>${button(food ? 'Ya descubrí un alimento' : 'Ya hice mi pausa', 'complete-habit', `data-habit="${id}"`)}</div>`, 'habit');
 }
-function showFocus() {
-  const f = state.focus;
-  const duration = f?.duration || 1500;
-  openModal('Un ratito de enfoque', `<p class="small muted">Elige una tarea pequeña. El temporizador continúa aunque cambies de pestaña dentro de Winy.</p><div class="timer-options" role="group" aria-label="Duración de la sesión">${[[1500, '25 min'], [300, '5 min'], [30, 'Prueba · 30 s']].map(([seconds, label]) => `<button class="pill ${duration === seconds ? 'active' : ''}" data-action="focus-duration" data-duration="${seconds}" aria-pressed="${duration === seconds}">${label}</button>`).join('')}</div><div class="timer-circle"><span id="timer-time" role="timer" aria-label="Tiempo restante">25:00</span><span id="timer-status">Listo cuando tú quieras.</span></div>${button('Empezar', 'focus-toggle', 'id="timer-toggle"')}${button('Reiniciar sesión', 'focus-reset', '', 'secondary full')}<p class="footnote">Una sesión completada suma a tu hábito de enfoque. Una recompensa por día.</p>`, 'focus');
-  updateTimer();
-}
-function updateTimer() {
-  const f = state.focus;
-  let remaining = f ? f.endsAt ? Math.max(0, Math.ceil((f.endsAt - Date.now()) / 1000)) : f.remaining : 1500;
-  if (f?.endsAt && remaining === 0) {
-    f.endsAt = 0; f.remaining = 0;
-    const rewarded = completeHabit(state, 'focus'); save(); render();
-    toast(rewarded ? '¡Sesión completada! +20 XP y +8 monedas.' : '¡Terminaste otra sesión de enfoque!');
-  }
-  if (modal !== 'focus') return;
-  const display = document.querySelector('#timer-time');
-  if (!display) return;
-  display.textContent = `${String(Math.floor(remaining / 60)).padStart(2, '0')}:${String(remaining % 60).padStart(2, '0')}`;
-  document.querySelector('#timer-status').textContent = f?.endsAt ? 'Una cosa a la vez. Tú puedes.' : remaining === 0 ? '¡Un pequeño gran logro!' : f && remaining !== f.duration ? 'En pausa. Vuelve a tu ritmo.' : 'Listo cuando tú quieras.';
-  document.querySelector('#timer-toggle').textContent = f?.endsAt ? 'Pausar' : remaining === 0 ? 'Otra sesión' : 'Empezar';
-}
+function showFocus(gameId) { pomodoro.show(gameId); }
+function updateTimer() { pomodoro.tick(); }
 document.addEventListener('click', async event => {
   const el = event.target.closest('[data-action]');
   if (!el || el.disabled) return;
@@ -277,16 +277,8 @@ document.addEventListener('click', async event => {
   else if (action === 'reset-map') { destination = null; render(); }
   else if (action === 'habit') showHabit(el.dataset.habit);
   else if (action === 'complete-habit') { const done = completeHabit(state, el.dataset.habit); save(); render(); closeModal(); toast(done ? '¡Una pequeña victoria! +20 XP y +8 monedas.' : 'Ya registraste este hábito hoy.'); }
-  else if (action === 'focus') showFocus();
-  else if (action === 'focus-duration') { const duration = Number(el.dataset.duration); state.focus = { duration, remaining: duration, endsAt: 0 }; save(); showFocus(); }
-  else if (action === 'focus-reset') { const duration = state.focus?.duration || 1500; state.focus = { duration, remaining: duration, endsAt: 0 }; save(); updateTimer(); }
-  else if (action === 'focus-toggle') {
-    if (!state.focus) state.focus = { duration: 1500, remaining: 1500, endsAt: 0 };
-    const f = state.focus;
-    if (f.endsAt) { f.remaining = Math.max(0, Math.ceil((f.endsAt - Date.now()) / 1000)); f.endsAt = 0; }
-    else { if (!f.remaining) f.remaining = f.duration; f.endsAt = Date.now() + f.remaining * 1000; }
-    save(); updateTimer();
-  }
+  else if (action === 'focus') showFocus(el.dataset.quiz);
+  else if (pomodoro.handle(action, el)) return;
   else if (action === 'share') {
     const text = 'Winy · Tu pequeña gran aventura. Aprende, crea hábitos y descubre el Perú.';
     try { if (window.WinyAndroid?.share) window.WinyAndroid.share(text); else if (navigator.share) await navigator.share({ title: 'Winy', text, url: location.href }); else if (navigator.clipboard) { await navigator.clipboard.writeText(text + '\n' + location.href); toast('Invitación copiada. Compártela con tu tribu.'); } else openModal('Comparte Winy', `<p>Comparte esta dirección con tu tribu:</p><input aria-label="Dirección de Winy" value="${esc(location.href)}" readonly>`); }
@@ -323,11 +315,12 @@ document.addEventListener('submit', async event => {
     if (!p1 || !p2) return;
     startQuiz(QUIZZES[fd.get('quiz')], [p1, p2]);
   }
+  else if (form.id === 'explain-form') { const text = form.querySelector('textarea'); if (text.value.trim().length < 12) { text.setCustomValidity('Escribe una explicación breve con tus palabras.'); text.reportValidity(); text.setCustomValidity(''); return; } text.readOnly = true; form.querySelector('button').hidden = true; dialog.querySelector('.review-back').hidden = false; dialog.querySelector('.card-ratings').hidden = false; dialog.querySelector('.review-back').scrollIntoView({ block: 'nearest', behavior: 'smooth' }); }
   else if (form.id === 'answer-form') answerQuiz(new FormData(form).get('answer').trim());
   else if (form.id === 'notes-form') await studyFlow.submit(form);
 
 });
-document.addEventListener('input', event => { if (event.target.matches('input')) event.target.setCustomValidity(''); });
+document.addEventListener('input', event => { if (event.target.matches('input')) event.target.setCustomValidity(''); if (event.target.matches('#focus-goal, #focus-game')) { pomodoro.capture(); save(); } });
 document.addEventListener('visibilitychange', updateTimer);
 setInterval(updateTimer, 500);
 window.winyBack = () => {
@@ -346,6 +339,7 @@ const online = createOnline({
   }
 });
 const studyFlow = createStudyFlow({ open: openModal, dialog, getService: () => service, refresh: refreshService, onGame: game => { state.games = [...state.games.filter(g => g.id !== game.id), game].slice(-10); save(); render(); showAnalysis(game); } });
+const pomodoro = createPomodoro({ getState: () => state, save, render, open: openModal, active: () => modal === 'focus' && dialog.open, dialog, toast, onReview: game => startQuiz(game, null, null, { review: true, format: 'explain', questions: (reviewQuestions(state, game).length ? reviewQuestions(state, game) : game.questions).slice(0, 3) }) });
 render(); updateTimer();
 if (confirmedEmail) showAccount(false);
 refreshService();

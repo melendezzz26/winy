@@ -4,7 +4,7 @@ import { analyze, currentName } from './connection.js';
 import { providerLabel, providerDisclosure } from './providers.js';
 
 const esc = value => String(value ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
-const FORMATS = { trivia: 'Trivia', cards: 'Tarjetas de memoria', mixed: 'Repaso mixto' };
+const FORMATS = { trivia: 'Trivia', cards: 'Tarjetas de memoria', mixed: 'Repaso mixto', explain: 'Explicación con mis palabras' };
 export function createStudyFlow({ open, dialog, getService, refresh, onGame }) {
   let cached = null, values = null, prepared = null, work = null;
   function snapshot(form) { return { topic: form.topic.value, notes: form.notes.value, mode: form.mode.value, format: form.format.value, scope: form.scope.value }; }
@@ -19,7 +19,7 @@ export function createStudyFlow({ open, dialog, getService, refresh, onGame }) {
       <label for="topic">¿Qué tema quieres estudiar?</label><input id="topic" name="topic" maxlength="100" placeholder="Ej. Primer militarismo en el Perú">
       <div class="upload-area"><strong>Trae tus archivos</strong><p>PDF con texto, DOCX, PPTX, TXT o Markdown<br>Hasta 5 archivos · 8 MB por archivo</p><input id="files" type="file" accept=".pdf,.docx,.pptx,.txt,.md,.markdown" multiple aria-label="Elegir archivos de apuntes"><p id="cached-files"></p></div>
       <label for="notes">O pega un fragmento de tus apuntes</label><textarea id="notes" name="notes" rows="4" maxlength="80000" placeholder="Pega varios párrafos de tu clase…"></textarea>
-      <label for="review-format">Elige tu juego</label><select id="review-format" name="format"><option value="trivia">Trivia · elige una respuesta</option><option value="cards">Tarjetas · recuerda y da la vuelta</option><option value="mixed">Mixto · combina trivia y tarjetas</option></select>
+      <label for="review-format">Elige tu juego</label><select id="review-format" name="format"><option value="trivia">Trivia · elige una respuesta</option><option value="cards">Tarjetas · recuerda y da la vuelta</option><option value="mixed">Mixto · combina trivia y tarjetas</option><option value="explain">Con mis palabras · explica y compara</option></select>
       <p class="small muted">En todos los modos podrás repasar tus errores y volver a practicar más adelante.</p>
       <label for="study-scope">Cuánto quieres analizar</label><select id="study-scope" name="scope"><option value="fast">Lectura rápida · hasta 24.000 caracteres</option><option value="full">Documento completo · hasta 80.000 caracteres</option></select>
       <div id="source-preview"></div><p id="study-progress" class="study-progress" role="status" aria-live="polite"></p><p class="form-error" id="notes-error" role="alert"></p>
@@ -40,7 +40,7 @@ export function createStudyFlow({ open, dialog, getService, refresh, onGame }) {
   }
   function preview(form, material) {
     const mode = form.format.value;
-    form.querySelector('#source-preview').innerHTML = `<section class="source-preview"><span class="tag">Tu archivo está leído</span><h3>${FORMATS[mode]}</h3><p>${mode === 'cards' ? 'Piensa tu respuesta, descubre la explicación y marca qué recordaste.' : mode === 'mixed' ? 'Alterna preguntas con tarjetas para recordar sin mirar las alternativas.' : 'Responde preguntas, recibe una explicación y vuelve a practicar tus errores.'}</p><p class="small">${material.selected.toLocaleString('es-PE')} de ${material.total.toLocaleString('es-PE')} caracteres${material.sampled ? ' · extractos distribuidos' : ' · texto completo leído'}</p><details><summary>Ver el texto detectado</summary><blockquote>${esc(material.sources[0]?.text.slice(0, 750))}<cite>${esc(material.sources[0]?.name)}</cite></blockquote></details><p class="small muted">Se crearán hasta 6 preguntas con IA, o hasta 8 ejercicios locales según el material. Podrás ver el juego antes de empezar.</p></section>`;
+    form.querySelector('#source-preview').innerHTML = `<section class="source-preview"><span class="tag">Tu archivo está leído</span><h3>${FORMATS[mode]}</h3><p>${mode === 'explain' ? 'Escribe tu explicación sin mirar. Luego compárala con la respuesta y los apuntes; tú valoras qué falta.' : mode === 'cards' ? 'Piensa tu respuesta, descubre la explicación y marca qué recordaste.' : mode === 'mixed' ? 'Alterna preguntas con tarjetas para recordar sin mirar las alternativas.' : 'Responde preguntas, recibe una explicación y vuelve a practicar tus errores.'}</p><p class="small">${material.selected.toLocaleString('es-PE')} de ${material.total.toLocaleString('es-PE')} caracteres${material.sampled ? ' · extractos distribuidos' : ' · texto completo leído'}</p><details><summary>Ver el texto detectado</summary><blockquote>${esc(material.sources[0]?.text.slice(0, 750))}<cite>${esc(material.sources[0]?.name)}</cite></blockquote></details><p class="small muted">Se crearán hasta 6 preguntas con IA, o hasta 8 ejercicios locales según el material. Podrás ver el juego antes de empezar.</p></section>`;
     form.querySelector('button[type=submit]').textContent = 'Preparar mi ' + FORMATS[mode].toLowerCase();
     form.querySelector('.source-preview').scrollIntoView({ block: 'nearest', behavior: 'smooth' });
   }

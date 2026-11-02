@@ -2,7 +2,7 @@
 
 El proyecto `android/` empaqueta el juego disponible en `web/` dentro de un WebView. Incluye las mascotas originales, fuentes y lectores de documentos. Los modos locales funcionan sin servidor; la IA y las salas entre teléfonos requieren el servidor HTTPS configurado. Consulta [cómo activar esos servicios](ia-y-salas.md).
 
-El APK 0.5.0 de esta rama apunta a `https://winy.onrender.com`. El proveedor se selecciona en Render; admite OpenAI, Google Gemini y Groq sin incluir sus claves en el APK. Si encuentra `GEMINI_API_KEY` y no hay un proveedor explícito, selecciona Gemini.
+El APK 0.6.0 de esta rama apunta a `https://winy.onrender.com`. Incluye Pomodoro con metas y descansos, explicación con palabras propias y repaso de dudas. El proveedor se selecciona en Render; admite OpenAI, Google Gemini y Groq sin incluir sus claves en el APK. Si encuentra `GEMINI_API_KEY` y no hay un proveedor explícito, selecciona Gemini.
 
 ## Instalar el APK de prueba
 

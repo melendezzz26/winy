@@ -3,6 +3,19 @@ import assert from 'node:assert/strict';
 import { initialState, restoreState } from '../web/core/state.js';
 import { recordReview, reviewQuestions, questionKey, selectMaterial } from '../web/core/review.js';
 const game = { id: 'notes-clase', title: 'Mi clase', questions: [{ prompt: 'La planta usa ________.', expected: 'luz', evidence: 'La planta usa luz para crecer.', source: 'Clase' }, { prompt: 'Las raíces absorben ________.', expected: 'agua', evidence: 'Las raíces absorben agua del suelo.', source: 'Clase' }] };
+test('un acierto con dudas vuelve pronto y no cuenta como recuerdo seguro', () => {
+  const state = initialState(), q = game.questions[0]; state.games = [game];
+  recordReview(state, game, q, true, 1000, 'unsure');
+  assert.equal(state.reviews[game.id][questionKey(q)].streak, 0);
+  assert.equal(state.reviews[game.id][questionKey(q)].dueAt, 601000);
+  assert.deepEqual(reviewQuestions(restoreState(state), game, { errorsOnly: true }), [q]);
+  assert.equal(reviewQuestions(state, game, { now: 600999 }).length, 0);
+  assert.equal(reviewQuestions(state, game, { now: 601000 }).length, 1);
+  recordReview(state, game, q, true, 601000, 'sure');
+  assert.equal(state.reviews[game.id][questionKey(q)].streak, 1);
+  assert.equal(state.reviews[game.id][questionKey(q)].dueAt, 601000 + 86400000);
+  assert.equal(reviewQuestions(state, game, { errorsOnly: true }).length, 0);
+});
 test('los errores se pueden repasar de inmediato y los aciertos vuelven con intervalos crecientes', () => {
   let state = initialState(); state.games = [game];
   recordReview(state, game, game.questions[0], false, 1000);

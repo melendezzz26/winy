@@ -1,5 +1,7 @@
 # Auditoría funcional de Winy · 0.5.0
 
+La auditoría educativa posterior y los cambios de Pomodoro de 0.6.0 están en [Aprendizaje para 15–16 años](auditoria-aprendizaje.md).
+
 La revisión cubre navegación, progreso, documentos, generación de trivia, mapa, accesorios y salas entre dos clientes. Las mejoras se implementaron en el código y en el APK de esta rama.
 
 ## Hallazgos y correcciones

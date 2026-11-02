@@ -3,6 +3,12 @@ import assert from 'node:assert/strict';
 import { createAI, validateAnalysis } from '../server/ai.mjs';
 const sources = [{ name: 'Clase.pdf · página 2', text: 'La fotosíntesis transforma energía luminosa en energía química. Las raíces absorben agua y nutrientes del suelo.' }];
 const example = () => ({ insufficient_material: false, title: 'Las plantas', summary: 'La planta obtiene recursos y transforma energía.', key_points: [{ idea: 'Conversión de energía', source_id: 0, quote: 'La fotosíntesis transforma energía luminosa en energía química.' }, { idea: 'Absorción de agua', source_id: 0, quote: 'Las raíces absorben agua y nutrientes del suelo.' }], questions: [{ prompt: '¿Qué transforma la fotosíntesis?', options: ['Energía luminosa', 'Rocas', 'Sonido'], answer: 0, explanation: 'Transforma energía luminosa en química.', source_id: 0, quote: 'La fotosíntesis transforma energía luminosa en energía química.' }, { prompt: '¿Qué absorben las raíces?', options: ['Solo aire', 'Agua y nutrientes', 'Luz'], answer: 1, explanation: 'Absorben agua y nutrientes del suelo.', source_id: 0, quote: 'Las raíces absorben agua y nutrientes del suelo.' }] });
+test('el análisis conserva la habilidad de estudio y acepta juegos anteriores sin esa etiqueta', () => {
+  const value = example(); value.questions[0].skill = 'understand'; value.questions[1].skill = 'apply';
+  assert.deepEqual(validateAnalysis(value, sources).questions.map(q => q.skill), ['understand', 'apply']);
+  assert.equal(validateAnalysis(example(), sources).questions[0].skill, 'recall');
+  value.questions[0].skill = 'invented'; assert.throws(() => validateAnalysis(value, sources), /habilidad/);
+});
 test('el análisis conserva ideas y citas verificadas, y rechaza fuentes o citas inventadas', () => {
   const game = validateAnalysis(example(), sources); assert.equal(game.questions.length, 2); assert.equal(game.keyPoints.length, 2); assert.equal(game.questions[0].source, sources[0].name);
   const bad = example(); bad.questions[0].quote = 'Una afirmación que no aparece en el documento.'; assert.throws(() => validateAnalysis(bad, sources), /verificar una cita/);
@@ -24,6 +30,8 @@ test('la llamada usa Responses API y JSON estructurado sin introducir la clave e
   const ai = createAI({ provider: 'openai', key: 'test-only-token', transport: async (url, options) => { captured = { url, options }; return { ok: true, json: async () => ({ status: 'completed', output: [{ content: [{ type: 'output_text', text: JSON.stringify(example()) }] }] }) }; } });
   const game = await ai.generate(sources, 'Plantas'); const body = JSON.parse(captured.options.body);
   assert.equal(captured.url, 'https://api.openai.com/v1/responses'); assert.equal(body.model, 'gpt-5.4-mini'); assert.equal(body.store, false); assert.equal(body.text.format.strict, true); assert.ok(!JSON.stringify(game).includes('test-only-token'));
+  assert.match(body.instructions, /15 y 16 años/); assert.match(body.instructions, /skill=understand/); assert.match(body.instructions, /skill=apply/);
+  assert.ok(body.text.format.schema.properties.questions.items.required.includes('skill'));
 });
 test('la falta de cuota se distingue del límite temporal y no expone el mensaje del proveedor', async () => {
   const failed = (status, error) => createAI({ provider: 'openai', key: 'test-only-token', transport: async () => ({ ok: false, status, json: async () => ({ error }) }) });

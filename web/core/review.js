@@ -8,17 +8,19 @@ export function restoreReviews(value) {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return {};
   return Object.fromEntries(Object.entries(value).filter(([id, records]) => typeof id === 'string' && !['__proto__', 'constructor', 'prototype'].includes(id) && records && typeof records === 'object' && !Array.isArray(records)).slice(-40).map(([id, records]) => [id, Object.fromEntries(Object.entries(records).filter(([key, r]) => /^[a-z0-9]{1,8}$/.test(key) && r && Number.isInteger(r.attempts) && r.attempts > 0 && r.attempts < 100000 && Number.isInteger(r.streak) && r.streak >= 0 && r.streak <= 10 && Number.isFinite(r.dueAt) && typeof r.correct === 'boolean').slice(-50))]));
 }
-export function recordReview(state, game, question, correct, now = Date.now()) {
+export function recordReview(state, game, question, correct, now = Date.now(), confidence = 'sure') {
   state.reviews ||= {}; const records = state.reviews[game.id] ||= {};
   const key = questionKey(question), old = records[key];
-  const alreadyScheduled = correct && old?.correct && old.dueAt > now;
-  const streak = correct ? alreadyScheduled ? old.streak : Math.min(10, (old?.streak || 0) + 1) : 0;
-  records[key] = { attempts: Math.min(99999, (old?.attempts || 0) + 1), streak, correct, dueAt: alreadyScheduled ? old.dueAt : now + (correct ? [DAY, 3 * DAY, 7 * DAY, 14 * DAY][Math.min(3, streak - 1)] : 60000) };
+  confidence = confidence === 'sure' ? 'sure' : 'unsure';
+  const confident = correct && confidence === 'sure';
+  const alreadyScheduled = confident && old?.correct && old.confidence !== 'unsure' && old.dueAt > now;
+  const streak = confident ? alreadyScheduled ? old.streak : Math.min(10, (old?.streak || 0) + 1) : 0;
+  records[key] = { attempts: Math.min(99999, (old?.attempts || 0) + 1), streak, correct, confidence, dueAt: alreadyScheduled ? old.dueAt : now + (confident ? [DAY, 3 * DAY, 7 * DAY, 14 * DAY][Math.min(3, streak - 1)] : correct ? 10 * 60000 : 60000) };
   state.reviews = Object.fromEntries(Object.entries(state.reviews).slice(-40));
 }
 export function reviewQuestions(state, game, { errorsOnly = false, now = Date.now() } = {}) {
   const records = state.reviews?.[game.id] || {};
-  return game.questions.filter(q => { const record = records[questionKey(q)]; return record && (errorsOnly ? !record.correct : !record.correct || record.dueAt <= now); });
+  return game.questions.filter(q => { const record = records[questionKey(q)]; return record && (errorsOnly ? !record.correct || record.confidence === 'unsure' : !record.correct || record.dueAt <= now); });
 }
 export function reviewCount(state) { return state.games.reduce((n, game) => n + reviewQuestions(state, game).length, 0); }
 
