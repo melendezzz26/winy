@@ -2,7 +2,7 @@ import { randomUUID, createHash } from 'node:crypto';
 
 export function createStudyJobs({ generate, save, reserve, clock = Date.now }) {
   const jobs = new Map();
-  const view = job => ({ id: job.id, status: job.status, stage: job.stage, attempt: job.attempt, elapsed: Math.max(0, clock() - job.created), ...(job.game ? { game: job.game } : {}), ...(job.error ? { error: job.error, code: job.code } : {}) });
+  const view = job => ({ id: job.id, status: job.status, stage: job.stage, attempt: job.attempt, elapsed: Math.max(0, clock() - job.created), ...(job.provider ? { provider: job.provider, fallback: job.fallback } : {}), ...(job.game ? { game: job.game } : {}), ...(job.error ? { error: job.error, code: job.code } : {}) });
   const clean = () => { for (const [id, job] of jobs) if (job.finished && clock() - job.finished > 600000) jobs.delete(id); };
   function start(owner, sources, topic) {
     clean();
@@ -17,7 +17,7 @@ export function createStudyJobs({ generate, save, reserve, clock = Date.now }) {
     const deadline = setTimeout(() => job.controller.abort(new Error('ai_timeout')), 60000);
     job.done = (async () => {
       try {
-        const game = await generate(sources, topic, { signal: job.controller.signal, beforeRetry: () => reserve(owner), onProgress: progress => { job.stage = progress.stage; job.attempt = progress.attempt || job.attempt; } });
+        const game = await generate(sources, topic, { signal: job.controller.signal, beforeRetry: () => reserve(owner), onProgress: progress => { job.stage = progress.stage; job.attempt = progress.attempt || job.attempt; if (progress.provider) job.provider = progress.provider; if (progress.fallback || progress.stage === 'fallback') job.fallback = true; } });
         job.controller.signal.throwIfAborted();
         save(owner, game); job.game = game; job.status = 'completed'; job.stage = 'completed';
       } catch (error) {

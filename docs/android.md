@@ -2,7 +2,7 @@
 
 El proyecto `android/` empaqueta el juego disponible en `web/` dentro de un WebView. Incluye las mascotas originales, fuentes y lectores de documentos. Los modos locales funcionan sin servidor; la IA y las salas entre teléfonos requieren el servidor HTTPS configurado. Consulta [cómo activar esos servicios](ia-y-salas.md).
 
-El APK 0.4.0 de esta rama apunta a `https://winy.onrender.com`. El proveedor se selecciona en Render; admite OpenAI y Google Gemini sin incluir sus claves en el APK. Si encuentra `GEMINI_API_KEY` y no hay un proveedor explícito, selecciona Gemini.
+El APK 0.5.0 de esta rama apunta a `https://winy.onrender.com`. El proveedor se selecciona en Render; admite OpenAI, Google Gemini y Groq sin incluir sus claves en el APK. Si encuentra `GEMINI_API_KEY` y no hay un proveedor explícito, selecciona Gemini.
 
 ## Instalar el APK de prueba
 
@@ -52,3 +52,5 @@ El script ejecuta `assembleDebug` y `lintDebug`, verifica la firma mediante `apk
 En el entorno de nube preparado se conservan las herramientas en `/workspace/.winy-tools`. El script reutiliza esas instalaciones, la CA del entorno y el proxy configurado, manteniendo la verificación TLS. `WINY_GRADLE` permite seleccionar otro ejecutable de Gradle.
 
 La validación web usa `npm run test:browser` con `npm start` activo. Compilar, verificar la firma y pasar Android Lint no sustituye probar el APK en un dispositivo real.
+
+El respaldo automático Gemini → Groq se configura en Render según [esta guía](groq.md). El APK 0.5.0 muestra el proveedor utilizado y la cobertura de los extractos del respaldo.

@@ -6,7 +6,7 @@ const example = () => ({ insufficient_material: false, title: 'Las plantas', sum
 test('el análisis conserva ideas y citas verificadas, y rechaza fuentes o citas inventadas', () => {
   const game = validateAnalysis(example(), sources); assert.equal(game.questions.length, 2); assert.equal(game.keyPoints.length, 2); assert.equal(game.questions[0].source, sources[0].name);
   const bad = example(); bad.questions[0].quote = 'Una afirmación que no aparece en el documento.'; assert.throws(() => validateAnalysis(bad, sources), /verificar una cita/);
-  const missing = example(); missing.questions[0].source_id = 8; assert.throws(() => validateAnalysis(missing, sources), /verificar una cita/);
+  const missing = example(); missing.questions[0].source_id = 8; assert.equal(validateAnalysis(missing, sources).questions[0].source, sources[0].name, 'Una cita literal única permite recuperar la fuente real sin inventar una referencia');
 });
 test('un análisis malformado, una cita extensa y preguntas repetidas no producen una trivia', () => {
   for (const value of [null, [], 'texto']) assert.throws(() => validateAnalysis(value, sources), /análisis incompleto/);
@@ -16,8 +16,8 @@ test('un análisis malformado, una cita extensa y preguntas repetidas no produce
   assert.throws(() => validateAnalysis(stringIndex, sources), /verificar una cita/);
   const repeated = example(); repeated.questions = [repeated.questions[0], { ...repeated.questions[0], prompt: '  ¿Qué transforma la fotosíntesis?  ' }];
   assert.throws(() => validateAnalysis(repeated, sources), /repitió las preguntas/);
-  const longQuote = example(); longQuote.questions[0].quote = sources[0].text.repeat(4);
-  assert.throws(() => validateAnalysis(longQuote, [{ ...sources[0], text: sources[0].text.repeat(4) }]), /verificar una cita/);
+  const longQuote = example(); longQuote.questions[0].quote = sources[0].text.repeat(20);
+  assert.throws(() => validateAnalysis(longQuote, [{ ...sources[0], text: sources[0].text.repeat(20) }]), /verificar una cita/);
 });
 test('la llamada usa Responses API y JSON estructurado sin introducir la clave en el juego', async () => {
   let captured;

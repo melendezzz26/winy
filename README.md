@@ -1,6 +1,6 @@
 # Winy 🌱
 
-**[Descargar APK de prueba 0.4.0](https://github.com/melendezzz26/winy/raw/refs/heads/winy-apk-prueba/winy-debug.apk)** · [Activar cuentas con Supabase](docs/cuentas.md) · [Configurar Gemini para pruebas](docs/gemini.md) · [Auditoría y mejoras](docs/auditoria.md) · [Configurar servidor](docs/ia-y-salas.md)
+**[Descargar APK de prueba 0.5.0](https://github.com/melendezzz26/winy/raw/refs/heads/winy-apk-prueba/winy-debug.apk)** · [Activar cuentas con Supabase](docs/cuentas.md) · [Activar Groq como respaldo](docs/groq.md) · [Configurar Gemini para pruebas](docs/gemini.md) · [Auditoría y mejoras](docs/auditoria.md) · [Configurar servidor](docs/ia-y-salas.md)
 
 Este APK incluye tutorial que se puede omitir, repasos con trivia y tarjetas, mapa geográfico, seis misiones con pasaporte y pañuelos que siguen el cuerpo de cada mascota. Se conecta a `https://winy.onrender.com`. Para usar la IA configura su clave en Render; no se incluyen claves en el APK. Las salas necesitan que el servidor esté activo.
 
@@ -18,7 +18,7 @@ npm start
 
 El servidor escucha en el puerto **4173**. Para probarlo desde otro dispositivo en tu red, usa `WINY_HOST=0.0.0.0 npm start`. En PowerShell: `$env:WINY_HOST="0.0.0.0"; npm start`. `PORT` permite elegir otro puerto.
 
-`postinstall` copia los lectores de documentos y la fuente a `web/vendor/`; también se ejecuta automáticamente con una instalación normal de npm. Los recursos del juego se sirven localmente. El modo sin conexión no requiere claves. El modo IA envía texto al servidor y al proveedor configurado (Gemini u OpenAI); las salas entre teléfonos usan el servidor incluido.
+`postinstall` copia los lectores de documentos y la fuente a `web/vendor/`; también se ejecuta automáticamente con una instalación normal de npm. Los recursos del juego se sirven localmente. El modo sin conexión no requiere claves. El modo IA envía texto al servidor y al proveedor configurado (Gemini, Groq u OpenAI); las salas entre teléfonos usan el servidor incluido.
 
 ## Qué funciona
 
@@ -39,9 +39,9 @@ En **Estudiar → Crear juego con mis archivos**, revisa primero el texto leído
 - Word `.docx` y PowerPoint `.pptx`, hasta 80 diapositivas (fflate y extracción del XML).
 - TXT, Markdown y texto pegado.
 
-El modo local crea preguntas para completar una palabra y conserva la frase original como evidencia. El modo IA selecciona ideas clave, genera un resumen y crea trivia con citas que se verifican contra el texto. Este segundo modo requiere activar la API en el servidor. No se incluye OCR: los escaneos, PDF con contraseña, `.doc` y `.ppt` no se procesan. Se guardan hasta 10 juegos en el dispositivo, con sus ejercicios, citas y agenda de repaso. La lectura rápida usa hasta 24.000 caracteres en extractos distribuidos y avisa si omite contenido; el modo completo admite hasta 80.000 caracteres. La preparación con IA muestra avances, se puede cancelar y conserva el archivo extraído al reintentar. Cada juego creado permite practicar los tres modos sin nuevas llamadas a la IA.
+El modo local crea preguntas para completar una palabra y conserva la frase original como evidencia. El modo IA selecciona ideas clave, genera un resumen y crea trivia. El modelo elige pasajes numerados y Winy recupera literalmente las citas del texto original. Se conservan las preguntas verificadas y se avisa si se descartaron partes sin respaldo. La compatibilidad con respuestas antiguas admite diferencias de formato sin inventar citas. Este segundo modo requiere activar la API en el servidor. No se incluye OCR: los escaneos, PDF con contraseña, `.doc` y `.ppt` no se procesan. Se guardan hasta 10 juegos en el dispositivo, con sus ejercicios, citas y agenda de repaso. La lectura rápida usa hasta 24.000 caracteres en extractos distribuidos y avisa si omite contenido; el modo completo admite hasta 80.000 caracteres. La preparación con IA muestra avances, se puede cancelar y conserva el archivo extraído al reintentar. Cada juego creado permite practicar los tres modos sin nuevas llamadas a la IA.
 
-Consulta [cómo configurar la API, el modelo y las salas](docs/ia-y-salas.md). Se puede elegir **OpenAI (`gpt-5.4-mini`)** o **Gemini (`gemini-3.8-flash`)**. Para pruebas con cuota gratuita de Google sigue [la guía de Gemini](docs/gemini.md); la cuota depende de tu cuenta y del modelo.
+Consulta [cómo configurar la API, el modelo y las salas](docs/ia-y-salas.md). Se puede elegir **OpenAI (`gpt-5.4-mini`)** o **Gemini (`gemini-3.8-flash`)**. Para pruebas con cuota gratuita de Google sigue [la guía de Gemini](docs/gemini.md). También se puede usar [Groq con `openai/gpt-oss-20b` como respaldo automático](docs/groq.md) cuando Gemini informa falta de cuota. Cada proveedor mantiene sus propios límites; el cupo global de Winy se aplica a ambos.
 
 ## Validar
 
@@ -75,7 +75,7 @@ La prueba usa Chrome DevTools Protocol, sin otro framework. También recorre tut
 - `web/assets/pets/`: los cuatro PNG originales de las mascotas.
 - `web/core/pets.js`: encuadre de cada ilustración y colocación de accesorios en el mismo espacio de coordenadas, compartidos por todas las pantallas.
 - `scripts/serve.mjs`: servidor HTTP para recursos de `web/` y la API.
-- `server/`: API de salas con SQLite, sesiones anónimas, puntuación y análisis mediante Gemini u OpenAI Responses API.
+- `server/`: API de salas con SQLite, sesiones anónimas, puntuación y análisis mediante Gemini, Groq u OpenAI Responses API.
 - `scripts/vendor.mjs`: recursos de terceros con versiones fijadas y licencias.
 
 ## Android

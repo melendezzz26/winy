@@ -78,7 +78,7 @@ export function createApi({ dbPath = process.env.WINY_DB || path.resolve('.local
       const pathname = new URL(req.url, 'http://localhost').pathname;
       const ip = req.socket.remoteAddress || 'local';
       rate(`requests:${ip}`, 240, 60000);
-      if (req.method === 'GET' && pathname === '/api/status') return reply(200, { online: true, ai: ai.enabled, provider: ai.provider || 'openai', model: ai.model, accounts: accounts.enabled });
+      if (req.method === 'GET' && pathname === '/api/status') return reply(200, { online: true, ai: ai.enabled, provider: ai.provider || 'openai', model: ai.model, accounts: accounts.enabled, ...(ai.fallback ? { fallback: ai.fallback } : {}) });
       if (req.method === 'POST' && ['/api/auth/register', '/api/auth/login'].includes(pathname)) {
         rate(`auth:${ip}`, 20, 900000);
         const input = await body(req);

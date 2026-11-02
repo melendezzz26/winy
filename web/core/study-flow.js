@@ -1,6 +1,7 @@
 import { readSources, makeStudyGame } from './study.js';
 import { selectMaterial } from './review.js';
 import { analyze, currentName } from './connection.js';
+import { providerLabel, providerDisclosure } from './providers.js';
 
 const esc = value => String(value ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
 const FORMATS = { trivia: 'Trivia', cards: 'Tarjetas de memoria', mixed: 'Repaso mixto' };
@@ -23,7 +24,7 @@ export function createStudyFlow({ open, dialog, getService, refresh, onGame }) {
       <label for="study-scope">Cuánto quieres analizar</label><select id="study-scope" name="scope"><option value="fast">Lectura rápida · hasta 24.000 caracteres</option><option value="full">Documento completo · hasta 80.000 caracteres</option></select>
       <div id="source-preview"></div><p id="study-progress" class="study-progress" role="status" aria-live="polite"></p><p class="form-error" id="notes-error" role="alert"></p>
       <button type="submit" class="primary">Ver mi repaso</button><button type="button" class="secondary full" data-action="cancel-study" hidden>Cancelar preparación</button></form>
-      <p class="notice">El modo IA envía el texto al servicio de Winy y a <span id="ai-provider-name">${service.provider === 'gemini' ? 'Google Gemini' : 'OpenAI'}</span>. Cada cita se comprueba contra los extractos. La lectura rápida distribuye extractos por el documento; puede omitir contenido. La opción sin conexión crea ejercicios locales. Hasta 40 páginas por PDF y 80 diapositivas por PPTX; no incluye OCR.</p>`, 'notes');
+      <p class="notice">El modo IA envía el texto al servicio de Winy y a <span id="ai-provider-name">${esc(providerDisclosure(service))}</span>. Cada cita se comprueba contra los extractos. La lectura rápida distribuye extractos por el documento; puede omitir contenido. Groq analiza hasta 10.000 caracteres en extractos si el material es mayor. La opción sin conexión crea ejercicios locales. Hasta 40 páginas por PDF y 80 diapositivas por PPTX; no incluye OCR.</p>`, 'notes');
     const form = dialog.querySelector('#notes-form');
     if (values) for (const key of ['topic', 'notes', 'mode', 'format', 'scope']) form.elements[key].value = values[key];
     if (cached) form.querySelector('#cached-files').textContent = 'Archivo preparado: ' + cached.files.map(f => f.name).join(', ');
@@ -34,7 +35,7 @@ export function createStudyFlow({ open, dialog, getService, refresh, onGame }) {
     const form = dialog.querySelector('#notes-form'); if (!form) return;
     const option = form.querySelector('option[value=ai]'); option.disabled = !service.ai;
     form.querySelector('#service-state').textContent = pending ? 'Conectando… Puedes preparar tus apuntes mientras tanto.' : service.ai ? 'IA configurada. Revisa primero el texto que quieres estudiar.' : service.online ? 'Puedes estudiar sin conexión mientras se activa la IA.' : 'El servicio no responde. Puedes actualizar la conexión o estudiar sin conexión.';
-    dialog.querySelector('#ai-provider-name').textContent = service.provider === 'gemini' ? 'Google Gemini' : 'OpenAI';
+    dialog.querySelector('#ai-provider-name').textContent = providerDisclosure(service);
     const retry = form.querySelector('[data-action=retry-service]'); retry.disabled = pending; retry.textContent = pending ? 'Conectando…' : 'Actualizar conexión';
   }
   function preview(form, material) {
@@ -64,7 +65,7 @@ export function createStudyFlow({ open, dialog, getService, refresh, onGame }) {
         prepared = { fingerprint, material }; preview(form, material); stage = 'Texto listo. Revisa la vista previa y prepara tu juego'; update(); return;
       }
       stage = values.mode === 'ai' ? 'La IA está seleccionando ideas y preparando tu repaso…' : 'Preparando ejercicios sin conexión…'; update();
-      let game = values.mode === 'ai' ? await analyze(material.sources, values.topic, currentName() || 'Explorador', { signal: controller.signal, onProgress: job => { stage = job.stage === 'retrying' ? 'El proveedor está ocupado. Reintentando una vez…' : job.stage === 'validating' ? 'Comprobando preguntas y citas…' : job.attempt > 1 ? 'Preparando el repaso · segundo intento…' : 'Seleccionando ideas y creando el repaso…'; update(); } }) : makeStudyGame(material.sources, values.topic);
+      let game = values.mode === 'ai' ? await analyze(material.sources, values.topic, currentName() || 'Explorador', { signal: controller.signal, onProgress: job => { stage = job.fallback || job.stage === 'fallback' ? `Preparando tu repaso con ${providerLabel(job.provider)} como respaldo…` : job.stage === 'retrying' ? 'El proveedor está ocupado. Reintentando una vez…' : job.stage === 'validating' ? 'Comprobando preguntas y citas…' : job.attempt > 1 ? 'Preparando el repaso · segundo intento…' : 'Seleccionando ideas y creando el repaso…'; update(); } }) : makeStudyGame(material.sources, values.topic);
       controller.signal.throwIfAborted();
       if (!form.isConnected) return;
       game = { ...game, playMode: values.format, coverage: { selected: material.selected, total: material.total, sampled: material.sampled } };

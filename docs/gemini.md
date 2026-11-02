@@ -57,3 +57,7 @@ Un `401` de Winy después de un despliegue puede corresponder a una sesión anti
 Los textos extraídos se envían a Google cuando eliges Gemini. Su tratamiento depende de las [condiciones de Gemini API](https://ai.google.dev/gemini-api/terms) y del plan que utilices. No se promete almacenamiento o tratamiento privado por el hecho de usar una cuota gratuita.
 
 La implementación y los errores se probaron con respuestas controladas. Este entorno no recibió tu clave de Google ni pudo acceder al dominio de Render por su política de red; **no se ha verificado todavía un análisis real con tu cuenta**.
+
+## Otro proveedor cuando se agota Gemini
+
+Desde 0.5.0 se puede configurar [Groq como respaldo automático](groq.md), con su propia clave y cuota. Solo cambia al estar configurado explícitamente; nunca pasa automáticamente a OpenAI de pago. Ambos mantienen la validación de pasajes originales y el cupo global de Winy.

@@ -131,3 +131,15 @@ test('el repaso completo supera un rechazo opcional de Gemini y cobra exactament
   const limited = await f.call('/study', token, { ...input, topic: 'Otro enfoque' });
   assert.equal(limited.status, 429); assert.equal(limited.body.code, 'winy_daily_requests_limit'); assert.equal(calls, 2);
 });
+test('la API pasa de Gemini sin cuota a Groq, conserva citas y aplica el cupo global compartido', async t => {
+  const text = 'La fotosíntesis transforma energía luminosa en energía química. Las raíces absorben agua y nutrientes del suelo.';
+  const answer = { insufficient_material: false, title: 'Plantas', summary: 'Energía y recursos de las plantas.', key_points: [{ idea: 'Energía', source_id: 0, quote_id: 0 }, { idea: 'Raíces', source_id: 0, quote_id: 1 }], questions: [0, 1].map((quote_id) => ({ prompt: quote_id ? '¿Qué absorben las raíces?' : '¿Qué transforma la fotosíntesis?', options: ['Primera', 'Segunda', 'Tercera'], answer: 0, explanation: 'Un concepto de la fuente.', source_id: 0, quote_id })) };
+  let google = 0, groq = 0;
+  const ai = createAI({ provider: 'gemini', key: 'test-google-secret', transport: async () => { google++; return Response.json({ error: { details: [{ violations: [{ quotaId: 'RequestsPerDay' }] }] } }, { status: 429 }); }, fallbackProvider: 'groq', fallbackOptions: { key: 'test-groq-secret', transport: async () => { groq++; return Response.json({ choices: [{ finish_reason: 'stop', message: { content: JSON.stringify(answer) } }] }); } } });
+  const f = await fixture(t, { ai, aiDailyLimit: 3 }), token = await f.player('Ana');
+  const status = (await f.call('/status')).body; assert.equal(status.fallback.provider, 'groq'); assert.equal(status.fallback.enabled, true); assert.ok(!JSON.stringify(status).includes('secret'));
+  async function create(topic) { let job = (await f.call('/study', token, { background: true, topic, sources: [{ name: 'Clase', text: text + ' ' + text }] })).body; for (let n = 0; n < 20 && job.status === 'running'; n++) { await new Promise(r => setTimeout(r, 10)); job = (await f.call('/study/jobs/' + job.id, token)).body; } return job; }
+  const first = await create('Tema 1'); assert.equal(first.status, 'completed'); assert.equal(first.game.provider, 'groq'); assert.equal(first.game.questions[0].source, 'Clase'); assert.ok(text.includes(first.game.questions[0].evidence));
+  assert.equal((await create('Tema 2')).status, 'completed'); assert.equal(google, 1); assert.equal(groq, 2);
+  const limited = await f.call('/study', token, { background: true, topic: 'Tema 3', sources: [{ text: text + ' ' + text }] }); assert.equal(limited.body.code, 'winy_daily_requests_limit'); assert.equal(groq, 2);
+});
