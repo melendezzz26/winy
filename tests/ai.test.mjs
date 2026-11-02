@@ -62,3 +62,13 @@ test('Gemini rechaza resultados truncados y citas inventadas sin generar un jueg
   const bad=createAI({ provider:'gemini', key:'test-only-google-key', transport:async()=>({ok:true,json:async()=>({candidates:[{finishReason:'STOP',content:{parts:[{text:JSON.stringify(fake)}]}}]})}) });
   await assert.rejects(bad.generate(sources,''), /verificar una cita/);
 });
+test('las variables estándar de Gemini seleccionan Gemini sin llamar al proveedor de pago', () => {
+  const names=['WINY_AI_PROVIDER','WINY_GEMINI_KEY','GEMINI_API_KEY','WINY_GEMINI_MODEL','GEMINI_MODEL','WINY_AI_KEY'];
+  const before=Object.fromEntries(names.map(n=>[n,process.env[n]]));
+  try {
+    for(const n of names) delete process.env[n];
+    process.env.GEMINI_API_KEY='test-only-standard-google-key';process.env.GEMINI_MODEL='gemini-3.8-flash';process.env.WINY_AI_KEY='test-only-old-openai-key';
+    const selected=createAI();assert.equal(selected.provider,'gemini');assert.equal(selected.enabled,true);assert.equal(selected.model,'gemini-3.8-flash');
+    process.env.WINY_AI_PROVIDER='openai';assert.equal(createAI().provider,'openai');
+  } finally { for(const n of names) {if(before[n]===undefined)delete process.env[n];else process.env[n]=before[n];} }
+});

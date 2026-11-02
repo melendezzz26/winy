@@ -22,6 +22,8 @@ En tu servicio `winy.onrender.com`, abre **Environment** y configura:
 
 Guarda las variables y despliega la última versión de la rama **`winy-apk-prueba`**. `WINY_AI_MODEL` y `WINY_AI_KEY` pertenecen al adaptador de OpenAI y no seleccionan el modelo de Gemini. Winy no cambia de proveedor automáticamente si se agota un cupo.
 
+También se admiten **`GEMINI_API_KEY`** y **`GEMINI_MODEL`**. Si no defines `WINY_AI_PROVIDER` y hay una clave de Gemini configurada, Winy selecciona Gemini al arrancar, aunque quede una clave antigua de OpenAI. Para elegir OpenAI explícitamente, define `WINY_AI_PROVIDER=openai`. La selección se hace al arrancar; no se cambia a un proveedor de pago si se agota la cuota gratuita.
+
 Después, abre **https://winy.onrender.com/api/status**. La respuesta esperada es:
 
 ```json

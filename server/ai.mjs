@@ -63,8 +63,9 @@ export function validateAnalysis(result, sources) {
 }
 
 export function createAI(options = {}) {
-  const provider = String(options.provider ?? process.env.WINY_AI_PROVIDER ?? 'openai').trim().toLowerCase();
-  if (provider === 'gemini') return createGemini({ key: options.key ?? process.env.WINY_GEMINI_KEY, model: options.model ?? process.env.WINY_GEMINI_MODEL ?? 'gemini-3.8-flash', transport: options.transport ?? fetch, schema, validateAnalysis, ServiceError: AIServiceError });
+  const geminiKey = process.env.WINY_GEMINI_KEY || process.env.GEMINI_API_KEY;
+  const provider = String(options.provider ?? (process.env.WINY_AI_PROVIDER || (geminiKey ? 'gemini' : 'openai'))).trim().toLowerCase();
+  if (provider === 'gemini') return createGemini({ key: options.key ?? geminiKey, model: options.model ?? (process.env.WINY_GEMINI_MODEL || process.env.GEMINI_MODEL || 'gemini-3.8-flash'), transport: options.transport ?? fetch, schema, validateAnalysis, ServiceError: AIServiceError });
   if (provider === 'openai') return createOpenAI(options);
   throw new Error('WINY_AI_PROVIDER debe ser openai o gemini.');
 }
